@@ -1,9 +1,14 @@
-import React from 'react';
-import { Check, Link as LinkIcon, AlignLeft, Trash2, Pencil, Clock3 } from 'lucide-react';
-import type { EnxovalItem } from '../types';
+import {
+  Check,
+  ExternalLink,
+  AlignLeft,
+  Trash2,
+  Pencil,
+  Clock3,
+} from "lucide-react";
+import type { EnxovalItem } from "../types";
 
 interface ItemRowProps {
-  key?: React.Key;
   item: EnxovalItem;
   categoryName?: string;
   showUpdatedAt?: boolean;
@@ -12,109 +17,105 @@ interface ItemRowProps {
   onDelete: (item: EnxovalItem) => void;
   onEdit: (item: EnxovalItem) => void;
 }
-
-const currencyFormatter = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL'
+const money = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
 });
-
-function normalizePriceCents(priceCents: number | string | null | undefined) {
-  if (typeof priceCents === 'number' && Number.isFinite(priceCents)) return Math.round(priceCents);
-  if (typeof priceCents === 'string' && priceCents.trim()) {
-    const parsed = Number(priceCents);
-    return Number.isFinite(parsed) ? Math.round(parsed) : null;
+function safeLink(value: string) {
+  if (!value.trim()) return "";
+  try {
+    const url = new URL(
+      /^https?:\/\//i.test(value) ? value : `https://${value}`,
+    );
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch {
+    return "";
   }
-  return null;
 }
-
-function formatCurrency(priceCents: number | string | null | undefined) {
-  const normalizedPriceCents = normalizePriceCents(priceCents);
-  return normalizedPriceCents !== null ? currencyFormatter.format(normalizedPriceCents / 100) : '';
-}
-
-export function ItemRow({ item, categoryName, showUpdatedAt, updatedAtLabel, onUpdate, onDelete, onEdit }: ItemRowProps) {
-  const toggleCheck = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    void Promise.resolve(onUpdate(item.id, { checked: !item.checked })).catch(() => undefined);
-  };
-
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onDelete(item);
-  };
-
-  const handleEdit = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onEdit(item);
-  };
-
-  const itemPriceCents = normalizePriceCents(item.priceCents);
-  const hasPrice = itemPriceCents !== null && itemPriceCents > 0;
-  const hasExtraInfo = Boolean(item.link || item.description);
-
+export function ItemRow({
+  item,
+  categoryName,
+  showUpdatedAt,
+  updatedAtLabel,
+  onUpdate,
+  onDelete,
+  onEdit,
+}: ItemRowProps) {
+  const price = Number(item.priceCents);
+  const formattedPrice =
+    Number.isFinite(price) && price > 0 ? money.format(price / 100) : "";
+  const link = safeLink(item.link);
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mb-3 transition-colors hover:border-brand-beige/50">
-      <div className="p-4 flex items-center justify-between">
-        <div className="flex items-center gap-4 flex-1 min-w-0">
-          <button
-            type="button"
-            onClick={toggleCheck}
-            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 ${
-              item.checked
-                ? 'bg-brand-wood border-brand-wood text-white'
-                : 'border-stone-300 text-transparent hover:border-brand-wood'
-            }`}
-          >
-            <Check size={14} strokeWidth={3} />
-          </button>
-
-          <div className="flex flex-col flex-1 min-w-0">
-            <span className={`text-base font-medium transition-all truncate ${item.checked ? 'text-stone-400 line-through' : 'text-stone-800'}`}>
-              {item.name}
-            </span>
-            {categoryName && (
-              <span className="mt-1 text-xs font-semibold uppercase tracking-wide text-brand-wood truncate">
-                {categoryName}
+    <div className={`item-row ${item.checked ? "checked" : ""}`}>
+      <div className="item-row-inner">
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={item.checked}
+          aria-label={`${item.checked ? "Desmarcar" : "Marcar como comprado"}: ${item.name}`}
+          className="item-check"
+          onClick={() =>
+            void Promise.resolve(
+              onUpdate(item.id, { checked: !item.checked }),
+            ).catch(() => undefined)
+          }
+        >
+          <Check size={13} strokeWidth={2.5} />
+        </button>
+        <div className="item-content">
+          <span className="item-name" title={item.name}>
+            {item.name}
+          </span>
+          <div className="item-meta">
+            {categoryName && <span>{categoryName}</span>}
+            {formattedPrice && (
+              <span className="item-meta-price" style={{ display: "none" }}>
+                {formattedPrice}
+              </span>
+            )}
+            {link && (
+              <a
+                href={link}
+                target="_blank"
+                rel="noopener noreferrer"
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <ExternalLink size={10} /> Ver na loja
+              </a>
+            )}
+            {item.description && (
+              <span title={item.description}>
+                <AlignLeft size={11} />
               </span>
             )}
             {showUpdatedAt && updatedAtLabel && (
-              <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-stone-500">
-                <Clock3 size={12} className="text-stone-400" />
-                Atualizado em {updatedAtLabel}
+              <span className="inline-flex items-center gap-1">
+                <Clock3 size={10} />
+                {updatedAtLabel}
               </span>
-            )}
-            {hasPrice && (
-              <span className="mt-1 text-sm font-semibold text-brand-wood">
-                {formatCurrency(itemPriceCents)}
-              </span>
-            )}
-            {hasExtraInfo && (
-              <div className="flex items-center gap-2 mt-1">
-                {item.link && <LinkIcon size={12} className="text-brand-wood" />}
-                {item.description && <AlignLeft size={12} className="text-brand-wood" />}
-              </div>
             )}
           </div>
         </div>
-
-        <div className="flex items-center gap-1 text-stone-400 shrink-0">
+        <span className="item-price">{formattedPrice || "Sem preço"}</span>
+        <span className="item-status">
+          {item.checked ? "Conquistado" : "Na lista"}
+        </span>
+        <div className="item-actions">
           <button
             type="button"
-            onClick={handleEdit}
-            aria-label="Editar item"
+            onClick={() => onEdit(item)}
+            aria-label={`Editar ${item.name}`}
             title="Editar item"
-            className="p-1.5 rounded-full text-stone-500 bg-stone-50 hover:text-brand-dark hover:bg-brand-beige/20 transition-colors"
           >
-            <Pencil size={15} />
+            <Pencil size={14} />
           </button>
           <button
             type="button"
-            onClick={handleDelete}
-            aria-label="Remover item"
+            onClick={() => onDelete(item)}
+            aria-label={`Remover ${item.name}`}
             title="Remover item"
-            className="p-1.5 rounded-full text-stone-500 bg-stone-50 hover:text-red-600 hover:bg-red-50 transition-colors"
           >
-            <Trash2 size={15} />
+            <Trash2 size={14} />
           </button>
         </div>
       </div>

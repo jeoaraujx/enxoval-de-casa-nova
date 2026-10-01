@@ -1,27 +1,27 @@
 {
-  "name": "Enxoval de Casa Nova",
-  "short_name": "Enxoval",
-  "start_url": "/",
+  "name": "Larumi — seu enxoval de casa nova",
+  "short_name": "Larumi",
+  "description": "Seu lar começa com um plano.",
+  "lang": "pt-BR",
+  "id": "/",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#faf8f4",
+  "theme_color": "#faf8f4",
   "icons": [
+    { "src": "/larumi-192.png", "sizes": "192x192", "type": "image/png" },
     {
-      "src": "/favicon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/favicon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    },
-    {
-      "src": "/icon-maskable-512x512.png",
+      "src": "/larumi-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/larumi-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

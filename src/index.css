@@ -1,18 +1,21 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap");
 @import "tailwindcss";
+@import "./product.css";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Playfair Display", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  
-  --color-brand-beige: #D4B895;
-  --color-brand-wood: #D1A77E;
-  --color-brand-gray: #9CA3AF;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif:
+    "Playfair Display", ui-serif, Georgia, Cambria, "Times New Roman", Times,
+    serif;
+
+  --color-brand-beige: #d4b895;
+  --color-brand-wood: #866344;
+  --color-brand-gray: #9ca3af;
   --color-brand-dark: #292524;
 }
 
 body {
-  background-color: #FAFAF9; /* stone-50 */
+  background-color: #fafaf9; /* stone-50 */
   color: #292524; /* stone-800 */
 }
 
@@ -21,8 +24,8 @@ body {
   display: none;
 }
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 .category-list-swipe {
   will-change: transform, opacity;
