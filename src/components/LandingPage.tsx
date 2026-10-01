@@ -26,11 +26,11 @@ import { Brand } from "./Brand";
 const faqs = [
   [
     "Preciso ter a casa pronta para começar?",
-    "Não! A Larumi acompanha seu planejamento desde a primeira ideia. Crie o enxoval, salve o que você gostou e vá marcando cada conquista no seu tempo.",
+    "Não! A Larume acompanha seu planejamento desde a primeira ideia. Crie o enxoval, salve o que você gostou e vá marcando cada conquista no seu tempo.",
   ],
   [
     "Posso organizar meu enxoval com outra pessoa?",
-    "Sim. Você pode adicionar uma pessoa que já tenha uma conta na Larumi pelo e-mail dela. Os membros podem editar a mesma lista e acompanhar as compras juntos.",
+    "Sim. Você pode adicionar uma pessoa que já tenha uma conta na Larume pelo e-mail dela. Os membros podem editar a mesma lista e acompanhar as compras juntos.",
   ],
   [
     "Funciona no celular e no computador?",
@@ -50,7 +50,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [faq, setFaq] = useState<number | null>(0);
   useEffect(() => {
-    document.title = "Larumi — seu lar começa com um plano";
+    document.title = "Larume — seu lar começa com um plano";
   }, []);
   return (
     <div className="marketing-page">
@@ -142,7 +142,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
           <div className="hero-visual">
             <img
               className="hero-photo"
-              src="/images/larumi-home.webp"
+              src="/images/larume-home.webp"
               alt="Sala acolhedora com sofá de linho, mesa de madeira e uma caixa de mudança"
               fetchPriority="high"
               width="1536"
@@ -371,7 +371,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
                     <strong>Da loja para a lista, em um toque</strong>
                     <p>
                       No sofá com o computador ou passeando pela loja com o
-                      celular. A Larumi vai junto.
+                      celular. A Larume vai junto.
                     </p>
                   </span>
                 </div>
@@ -564,7 +564,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
         </div>
         <span>
           Feito com cuidado, para novos começos.
-          <br />© {new Date().getFullYear()} Larumi
+          <br />© {new Date().getFullYear()} Larume
         </span>
       </footer>
     </div>

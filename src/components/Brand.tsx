@@ -11,13 +11,13 @@ export function Brand({
     <span
       className={`brand ${light ? "brand-light" : ""} ${stacked ? "brand-stacked" : ""}`}
       role="img"
-      aria-label="Larumi — seu lar começa aqui"
+      aria-label="Larume — seu lar começa aqui"
     >
       <img
         src={
           light
-            ? "/brand/larumi-symbol-white.webp"
-            : "/brand/larumi-symbol.webp"
+            ? "/brand/larume-symbol-white.webp"
+            : "/brand/larume-symbol.webp"
         }
         width="512"
         height="512"
@@ -25,7 +25,7 @@ export function Brand({
         aria-hidden="true"
         className="brand-symbol"
       />
-      {!compact && <span className="brand-word">Larumi</span>}
+      {!compact && <span className="brand-word">Larume</span>}
     </span>
   );
 }

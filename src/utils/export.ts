@@ -28,7 +28,7 @@ export function exportItems(items: EnxovalItem[], name: string) {
   );
   const link = document.createElement("a");
   link.href = url;
-  link.download = `larumi-${
+  link.download = `larume-${
     name
       .replace(/[^\p{L}\p{N}\s-]/gu, "")
       .trim()

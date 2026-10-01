@@ -32,7 +32,7 @@ for (const width of [320, 390, 768, 1024, 1440]) {
 
 test("landing navigation, FAQ and entry routes work", async ({ page }) => {
   await page.goto("/");
-  await expect(page).toHaveTitle("Larumi — seu lar começa com um plano");
+  await expect(page).toHaveTitle("Larume — seu lar começa com um plano");
   await page
     .getByRole("navigation", { name: "Navegação principal" })
     .getByRole("link", { name: "Planos", exact: true })
@@ -87,7 +87,7 @@ test("items can be created, edited, bought, exported, persisted and removed", as
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Exportar lista" }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/larumi-.+\.csv$/);
+  expect(download.suggestedFilename()).toMatch(/larume-.+\.csv$/);
   const stream = await download.createReadStream();
   const chunks: Buffer[] = [];
   for await (const chunk of stream!) chunks.push(chunk as Buffer);
@@ -245,7 +245,7 @@ test("login handles API errors and success; registration opens onboarding (mock 
 }) => {
   await page.goto("/demo");
   const workspace = await page.evaluate(
-    () => JSON.parse(localStorage.getItem("larumi.demo.v1")!).workspaces[0],
+    () => JSON.parse(localStorage.getItem("larume.demo.v1")!).workspaces[0],
   );
   const bootstrap = {
     user: { id: "test", name: "Pessoa Teste", email: "teste@example.com" },
@@ -448,9 +448,9 @@ test("mobile drawer switches workspaces, creates categories and keeps destructiv
     "Nosso primeiro apê",
   );
   await page.evaluate(() => {
-    const data = JSON.parse(localStorage.getItem("larumi.demo.v1")!);
+    const data = JSON.parse(localStorage.getItem("larume.demo.v1")!);
     data.workspaces[0].enxoval.role = "editor";
-    localStorage.setItem("larumi.demo.v1", JSON.stringify(data));
+    localStorage.setItem("larume.demo.v1", JSON.stringify(data));
   });
   await page.reload();
   await open();
@@ -503,7 +503,7 @@ test("saving dialogs stay open until the request settles and announce failures",
 }) => {
   await page.goto("/demo");
   const workspace = await page.evaluate(
-    () => JSON.parse(localStorage.getItem("larumi.demo.v1")!).workspaces[0],
+    () => JSON.parse(localStorage.getItem("larume.demo.v1")!).workspaces[0],
   );
   await page.route("**/api/bootstrap", (route) =>
     route.fulfill({

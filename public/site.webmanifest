@@ -1,6 +1,6 @@
 {
-  "name": "Larumi — seu enxoval de casa nova",
-  "short_name": "Larumi",
+  "name": "Larume — seu enxoval de casa nova",
+  "short_name": "Larume",
   "description": "Seu lar começa com um plano.",
   "lang": "pt-BR",
   "id": "/",
@@ -10,15 +10,15 @@
   "background_color": "#faf8f4",
   "theme_color": "#faf8f4",
   "icons": [
-    { "src": "/larumi-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/larume-192.png", "sizes": "192x192", "type": "image/png" },
     {
-      "src": "/larumi-512.png",
+      "src": "/larume-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/larumi-maskable-512.png",
+      "src": "/larume-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

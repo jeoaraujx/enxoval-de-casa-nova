@@ -69,7 +69,7 @@ type DiscountOperation = "add" | "subtract";
 type ItemSortMode = "name" | "updated";
 type CategorySwipeDirection = "next" | "previous";
 
-const APP_NAME = "Larumi";
+const APP_NAME = "Larume";
 
 function makeTitle(context?: string) {
   return context ? `${context} | ${APP_NAME}` : APP_NAME;
@@ -292,7 +292,7 @@ export default function App() {
 
   useEffect(() => {
     if (window.location.pathname === "/") {
-      document.title = "Larumi — seu lar começa com um plano";
+      document.title = "Larume — seu lar começa com um plano";
       return;
     }
     if (isLoading) {
@@ -1519,7 +1519,7 @@ export default function App() {
               <span>
                 <strong>{user.name}</strong>
                 <small>
-                  {isDemoMode() ? "Explorando a Larumi" : user.email}
+                  {isDemoMode() ? "Explorando a Larume" : user.email}
                 </small>
               </span>
               <button onClick={handleLogout} aria-label="Sair">
@@ -1531,7 +1531,7 @@ export default function App() {
         <div className="desktop-app-header">
           <span>
             Meu cantinho <ChevronRight size={14} />{" "}
-            <h1>{activeEnxoval?.name ?? "Bem-vindo à Larumi"}</h1>
+            <h1>{activeEnxoval?.name ?? "Bem-vindo à Larume"}</h1>
           </span>
           <div>
             {hasEnxoval && (

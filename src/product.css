@@ -3231,7 +3231,7 @@ h2 {
   background: #68563f;
 }
 .mobile-workspace-header .text-stone-400,
-.larumi-dialog .text-stone-400 {
+.larume-dialog .text-stone-400 {
   color: #746b63;
 }
 /* Desktop uses a labeled button; mobile keeps a generous icon tap target. */
@@ -3612,7 +3612,7 @@ h2 {
   backdrop-filter: blur(4px);
   animation: dialog-fade-in 0.15s ease-out;
 }
-.larumi-dialog {
+.larume-dialog {
   position: absolute;
   inset: auto 0 0;
   width: 100%;
@@ -3659,28 +3659,28 @@ h2 {
 .dialog-close:hover {
   background: #e2e7d8;
 }
-.larumi-dialog > form,
-.larumi-dialog > div:not(.dialog-heading) {
+.larume-dialog > form,
+.larume-dialog > div:not(.dialog-heading) {
   padding: 20px;
 }
-.larumi-dialog label {
+.larume-dialog label {
   font-size: 12px;
   color: #505847;
 }
-.larumi-dialog .text-stone-500 {
+.larume-dialog .text-stone-500 {
   color: #626958;
 }
-.larumi-dialog button {
+.larume-dialog button {
   min-height: 44px;
 }
-.larumi-dialog .icon-button {
+.larume-dialog .icon-button {
   min-width: 44px;
   padding: 10px;
   flex-shrink: 0;
 }
-.larumi-dialog input:not([type="checkbox"]),
-.larumi-dialog textarea,
-.larumi-dialog select {
+.larume-dialog input:not([type="checkbox"]),
+.larume-dialog textarea,
+.larume-dialog select {
   min-height: 46px;
   border-color: #dcded2;
   border-radius: 12px;
@@ -3688,47 +3688,47 @@ h2 {
   color: #343b32;
   font-size: 16px;
 }
-.larumi-dialog input::placeholder,
-.larumi-dialog textarea::placeholder {
+.larume-dialog input::placeholder,
+.larume-dialog textarea::placeholder {
   color: #737967;
 }
-.larumi-dialog input[type="checkbox"] {
+.larume-dialog input[type="checkbox"] {
   accent-color: #8a9978;
 }
-.larumi-dialog button[type="submit"],
-.larumi-dialog button.bg-brand-dark {
+.larume-dialog button[type="submit"],
+.larume-dialog button.bg-brand-dark {
   min-height: 46px;
   border-radius: 12px;
   font-size: 14px;
   background: #3f4838;
   color: #fff;
 }
-.larumi-dialog button[type="submit"]:hover:not(:disabled),
-.larumi-dialog button.bg-brand-dark:hover:not(:disabled) {
+.larume-dialog button[type="submit"]:hover:not(:disabled),
+.larume-dialog button.bg-brand-dark:hover:not(:disabled) {
   background: #303b2a;
 }
-.larumi-dialog button.bg-stone-100 {
+.larume-dialog button.bg-stone-100 {
   min-height: 44px;
   background: #eeeee6;
   color: #505847;
 }
-.larumi-dialog button.bg-red-600 {
+.larume-dialog button.bg-red-600 {
   min-height: 46px;
   border-radius: 12px;
   background: #a43d30;
   color: #fff;
   font-size: 14px;
 }
-.larumi-dialog button.bg-red-600:hover:not(:disabled) {
+.larume-dialog button.bg-red-600:hover:not(:disabled) {
   background: #8c3026;
 }
 .dialog-danger .dialog-heading h2 {
   color: #91382d;
 }
-.larumi-dialog .bg-stone-50 {
+.larume-dialog .bg-stone-50 {
   background: #f2f3eb;
 }
-.larumi-dialog .border-stone-100 {
+.larume-dialog .border-stone-100 {
   border-color: #e3e5da;
 }
 @keyframes dialog-fade-in {
@@ -3740,7 +3740,7 @@ h2 {
   }
 }
 @media (min-width: 768px) {
-  .larumi-dialog {
+  .larume-dialog {
     inset: 50% auto auto 50%;
     width: min(480px, calc(100vw - 48px));
     max-height: calc(100dvh - 48px);
@@ -3756,14 +3756,14 @@ h2 {
   .dialog-heading h2 {
     font-size: 22px;
   }
-  .larumi-dialog > form,
-  .larumi-dialog > div:not(.dialog-heading) {
+  .larume-dialog > form,
+  .larume-dialog > div:not(.dialog-heading) {
     padding: 16px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .dialog-backdrop,
-  .larumi-dialog {
+  .larume-dialog {
     animation: none;
   }
   .mobile-bottom-nav button {

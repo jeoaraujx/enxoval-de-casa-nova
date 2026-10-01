@@ -36,7 +36,7 @@ export function Dialog({
         aria-busy={busy}
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`larumi-dialog ${tone === "danger" ? "dialog-danger" : ""}`}
+        className={`larume-dialog ${tone === "danger" ? "dialog-danger" : ""}`}
       >
         <div className="dialog-heading">
           <h2 id={titleId}>{title}</h2>

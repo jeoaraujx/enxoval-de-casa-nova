@@ -31,7 +31,7 @@ export function AuthPage({
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   useEffect(() => {
-    document.title = `${mode === "login" ? "Entre, a casa é sua" : "Seu novo começo"} | Larumi`;
+    document.title = `${mode === "login" ? "Entre, a casa é sua" : "Seu novo começo"} | Larume`;
   }, [mode]);
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -60,7 +60,7 @@ export function AuthPage({
     <main className="auth-page">
       <section className="auth-story">
         <img
-          src="/images/larumi-home.webp"
+          src="/images/larume-home.webp"
           alt="Seu próximo lar, acolhedor e cheio de possibilidades"
         />
         <div className="auth-story-top">
