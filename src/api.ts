@@ -135,6 +135,30 @@ export function reorderCategories(enxovalId: string, categoryIds: string[]) {
   });
 }
 
+export function renameCategory(
+  enxovalId: string,
+  categoryId: string,
+  name: string,
+) {
+  return request<EnxovalCategory>(
+    `/api/categories/${encodeURIComponent(categoryId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ enxovalId, name }),
+    },
+  );
+}
+export function reorderItems(
+  enxovalId: string,
+  categoryId: string,
+  itemIds: string[],
+) {
+  return request<EnxovalItem[]>("/api/items/order", {
+    method: "PATCH",
+    body: JSON.stringify({ enxovalId, categoryId, itemIds }),
+  });
+}
+
 export function createItem(input: {
   enxovalId: string;
   name: string;

@@ -51,6 +51,7 @@ interface ItemRow {
   price_cents: number | null;
   sort_order: number;
   updated_at: string | Date;
+  created_at: string | Date;
 }
 
 interface TemplateRow {
@@ -132,6 +133,7 @@ function mapItem(row: ItemRow): EnxovalItem {
     description: row.description,
     priceCents: row.price_cents === null ? null : Number(row.price_cents),
     sortOrder: row.sort_order,
+    createdAt: serializeTimestamp(row.created_at),
     updatedAt: serializeTimestamp(row.updated_at)
   };
 }
@@ -217,6 +219,7 @@ async function fetchItems(queryable: Queryable, userId: string, enxovalId: strin
       i.description,
       i.price_cents,
       i.sort_order,
+      i.created_at,
       i.updated_at
     FROM items i
     INNER JOIN categories c ON c.id = i.category_id
@@ -399,11 +402,11 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
 
     if (input.categoryId) {
       category = await findCategory(client, input.userId, input.enxovalId, input.categoryId);
-      if (!category) throw new HttpError(404, 'Categoria não encontrada.');
+      if (!category) throw new HttpError(404, 'Ambiente não encontrado.');
     } else if (input.categoryName) {
       category = await findOrCreateCategory(client, input.userId, input.enxovalId, input.categoryName);
     } else {
-      throw new HttpError(400, 'Categoria é obrigatória.');
+      throw new HttpError(400, 'Ambiente é obrigatório.');
     }
 
     const orderResult = await client.query<{ next_order: number }>(`
@@ -429,6 +432,7 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
         i.description,
         i.price_cents,
         i.sort_order,
+        i.created_at,
         i.updated_at
       FROM items i
       INNER JOIN categories c ON c.id = i.category_id
@@ -488,7 +492,7 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
 
   if (typeof updates.categoryId === 'string') {
     const category = await findCategory(getPool(), userId, enxovalId, updates.categoryId);
-    if (!category) throw new HttpError(404, 'Categoria não encontrada.');
+    if (!category) throw new HttpError(404, 'Ambiente não encontrado.');
     addUpdate('category_id', updates.categoryId);
   }
 
@@ -511,6 +515,7 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
       description,
       price_cents,
       sort_order,
+      created_at,
       updated_at
   `, values);
 
@@ -539,7 +544,7 @@ async function reorderCategoriesForUser(userId: string, enxovalId: string, categ
 
     const uniqueCategoryIds = new Set(categoryIds);
     if (uniqueCategoryIds.size !== categoryIds.length) {
-      throw new HttpError(400, 'Categorias duplicadas na ordenação.');
+      throw new HttpError(400, 'Ambientes duplicados na ordenação.');
     }
 
     const existingResult = await client.query<{ id: string }>(`
@@ -552,7 +557,7 @@ async function reorderCategoriesForUser(userId: string, enxovalId: string, categ
     const existingIds = new Set(existingResult.rows.map(category => category.id));
     const invalidCategoryId = categoryIds.find(categoryId => !existingIds.has(categoryId));
     if (invalidCategoryId) {
-      throw new HttpError(400, 'A ordenação contém uma categoria inválida.');
+      throw new HttpError(400, 'A ordenação contém um ambiente inválido.');
     }
 
     const nextCategoryIds = [
@@ -786,7 +791,7 @@ export function registerApiRoutes(app: Express) {
 
   router.post('/categories', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
-    const name = requireText(req.body?.name, 'Nome da categoria');
+    const name = requireText(req.body?.name, 'Nome do ambiente');
     const enxovalId = requireText(req.body?.enxovalId, 'Enxoval');
 
     const category = await withTransaction(client => findOrCreateCategory(client, user.id, enxovalId, name));
@@ -803,6 +808,45 @@ export function registerApiRoutes(app: Express) {
     if (!categoryIds) throw new HttpError(400, 'Ordenação inválida.');
 
     res.json(await reorderCategoriesForUser(user.id, enxovalId, categoryIds));
+  }));
+
+  router.patch('/categories/:id', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    const enxovalId = requireText(req.body?.enxovalId, 'Enxoval');
+    const name = requireText(req.body?.name, 'Nome do ambiente');
+    if (name.length > 100) throw new HttpError(400, 'O nome pode ter no máximo 100 caracteres.');
+    await requireEnxovalMember(getPool(), user.id, enxovalId);
+    try {
+      const result = await getPool().query<CategoryRow>(
+        'UPDATE categories SET name = $3, updated_at = now() WHERE id = $1 AND enxoval_id = $2 RETURNING id, name, sort_order',
+        [req.params.id, enxovalId, name]);
+      if (!result.rows[0]) throw new HttpError(404, 'Ambiente não encontrado.');
+      res.json(mapCategory(result.rows[0]));
+    } catch (err) {
+      if ((err as { code?: string }).code === '23505') throw new HttpError(409, 'Já existe um ambiente com esse nome.');
+      throw err;
+    }
+  }));
+
+  router.patch('/items/order', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    const enxovalId = requireText(req.body?.enxovalId, 'Enxoval');
+    const categoryId = requireText(req.body?.categoryId, 'Ambiente');
+    const itemIds: string[] | null = Array.isArray(req.body?.itemIds) && req.body.itemIds.every((id: unknown) => typeof id === 'string') ? req.body.itemIds : null;
+    if (!itemIds || new Set(itemIds).size !== itemIds.length) throw new HttpError(400, 'Ordenação inválida ou com itens duplicados.');
+    const result = await withTransaction(async client => {
+      await requireEnxovalMember(client, user.id, enxovalId);
+      const category = await client.query('SELECT id FROM categories WHERE id = $1 AND enxoval_id = $2 FOR UPDATE', [categoryId, enxovalId]);
+      if (!category.rowCount) throw new HttpError(404, 'Ambiente não encontrado.');
+      const existing = await client.query<{ id: string }>('SELECT id FROM items WHERE enxoval_id = $1 AND category_id = $2 FOR UPDATE', [enxovalId, categoryId]);
+      const actual = new Set(existing.rows.map(item => item.id));
+      if (actual.size !== itemIds.length || itemIds.some(id => !actual.has(id))) throw new HttpError(409, 'A lista mudou. Atualize os itens antes de reordenar.');
+      for (const [position, id] of itemIds.entries()) {
+        await client.query('UPDATE items SET sort_order = $2 WHERE id = $1 AND enxoval_id = $3 AND category_id = $4', [id, position, enxovalId, categoryId]);
+      }
+      return (await fetchItems(client, user.id, enxovalId)).filter(item => item.categoryId === categoryId);
+    });
+    res.json(result);
   }));
 
   router.get('/items', asyncHandler(async (req, res) => {

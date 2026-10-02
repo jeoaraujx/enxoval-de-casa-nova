@@ -40,7 +40,6 @@ export function WorkspaceOverview({
   discountCents,
   onCategory,
   onInvite,
-  onAdd,
   view,
 }: {
   items: EnxovalItem[];
@@ -49,7 +48,6 @@ export function WorkspaceOverview({
   discountCents: number;
   onCategory: (id: string) => void;
   onInvite: () => void;
-  onAdd: () => void;
   view: "list" | "overview";
 }) {
   const done = items.filter((i) => i.checked);
@@ -196,11 +194,6 @@ export function WorkspaceOverview({
             </div>
           </aside>
         </div>
-      )}
-      {view === "overview" && (
-        <button className="button button-outline overview-add" onClick={onAdd}>
-          <Plus size={17} /> Adicionar uma nova conquista
-        </button>
       )}
     </>
   );

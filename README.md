@@ -13,7 +13,7 @@ Abra **http://localhost:3000**.
 
 - `/`: landing page com recursos, exemplos de planos e perguntas frequentes.
 - `/login` e `/signup`: entrada e cadastro com a nova identidade visual.
-- `/demo`: aplicativo interativo com um enxoval de exemplo. Permite criar, editar, concluir e remover itens, criar enxovais e categorias, reordenar ambientes, registrar descontos e exportar CSV.
+- `/demo`: aplicativo interativo com um enxoval de exemplo. Permite criar, editar, concluir e remover itens, criar enxovais e ambientes, reordenar ambientes e itens, registrar descontos e exportar CSV.
 - `/app`: aplicativo conectado à conta.
 
 O comando `dev:preview` **não conecta ao banco nem executa migrações**. A demonstração salva apenas os dados de exemplo em `localStorage`, na chave `larume.demo.v1`, sem salvar senhas. Esses dados são independentes da conta real. Convites não são enviados pela demonstração. Login e cadastro precisam do servidor completo; na prévia, o formulário explica essa condição.
@@ -51,14 +51,16 @@ O admin usa sessão própria em cookie HTTP-only, com duração de 8 horas e tok
 - Paleta de areia, madeira, off-white e verde suave; tipografia DM Sans e Playfair Display, com Cormorant Garamond na assinatura Larume.
 - Landing page, login e cadastro adaptados para celular, tablet e computador.
 - Navegação por ambientes e visão geral com progresso, total investido e estimativa dos itens pendentes.
-- No celular: categorias horizontais, gesto de deslizar entre ambientes, puxar para atualizar, cabeçalho compacto ao rolar, botão de adição e navegação inferior.
-- O cabeçalho mobile usa apenas o ícone do menu, com área de toque de 44 px. Na visão geral, as categorias e o total gasto ficam fora do cabeçalho; voltam na lista de itens.
+- No celular: ambientes horizontais, gesto de deslizar entre ambientes, puxar para atualizar, cabeçalho compacto ao rolar, botão de adição e navegação inferior.
+- O cabeçalho mobile usa apenas o ícone do menu, com área de toque de 44 px. Na visão geral, os ambientes e o total gasto ficam fora do cabeçalho; voltam na lista de itens.
 - A navegação inferior destaca a opção ativa com um fundo verde suave e borda arredondada. Compartilhar recebe o destaque enquanto sua janela está aberta.
-- O botão “Menu” abre um painel pela direita com troca e criação de enxovais, convites, descontos, categorias e atualização. Renomear e excluir aparecem apenas para o dono; excluir mantém a confirmação. O painel tem rolagem independente, bloqueia a interação com o fundo e devolve o foco ao botão ao fechar.
+- O ícone de menu abre um painel pela direita com convites, descontos e criação de ambientes. No mobile, também reúne seleção/criação de enxovais e a lista vertical de ambientes; no desktop, esses controles ficam na barra lateral. Renomear e excluir o enxoval aparecem apenas para o dono; excluir mantém a confirmação. O painel tem rolagem independente, bloqueia a interação com o fundo e devolve o foco ao botão ao fechar.
 - No computador: menu lateral, painel financeiro e ações de edição, convite e exportação.
-- Busca sem distinção de acentos, filtros e ordenação por nome ou alterações recentes.
-- Exportação CSV em português, UTF-8 e separador `;`, com proteção de células que poderiam ser interpretadas como fórmulas.
-- Diálogos com foco controlado, Escape para fechar e retorno ao botão de origem. Categorias podem ser reordenadas por arraste ou pelos botões de subir/descer.
+- Busca sem distinção de acentos, filtros e ordenação por nome, alterações recentes ou “Minha ordem”. Nesta última, sem busca/filtros, as alças reordenam os itens do ambiente. Ambientes podem ser arrastados na barra lateral, na faixa mobile e na lista vertical do menu. As alças também aceitam as setas pelo teclado; a ordem é persistida nos campos existentes.
+- Lápis junto aos nomes permite renomear o enxoval e os ambientes. Nome ou seta do item expande a edição na própria lista; o lápis continua abrindo o modal. A data de adição vem de `created_at` e permanece após editar. Dados antigos da demonstração sem essa data não recebem uma data inventada.
+- Dropdowns com o visual da Larume, navegação por teclado, seleção por toque e Escape para fechar as opções antes de fechar o diálogo.
+- Exportação CSV do enxoval completo ou do ambiente, em português, UTF-8 e separador `;`, com proteção de células que poderiam ser interpretadas como fórmulas. A exportação por ambiente inclui todos os seus itens, independentemente dos filtros ativos.
+- Diálogos com foco controlado, Escape para fechar e retorno ao botão de origem.
 - Adição, edição, filtros, convites e confirmações usam o mesmo componente de diálogo e a paleta da Larume. As confirmações de exclusão começam com foco em Cancelar; formulários longos têm rolagem própria em telas pequenas.
 - Respeito à preferência de movimento reduzido no CSS.
 
@@ -75,7 +77,7 @@ A suíte Playwright verifica os fluxos principais, persistência e exportação 
 
 No Windows, os testes usam o Microsoft Edge instalado. Em outros sistemas, instale o navegador de teste com `npx playwright install chromium`. Quando não há servidor local, os testes iniciam o modo de prévia, sem migração de banco; se já há um servidor na porta 3000, ele é reutilizado. As alterações dos testes ficam na demonstração ou em respostas de API simuladas. Os testes de login e cadastro verificam a integração do frontend com respostas simuladas, não a conexão real com PostgreSQL.
 
-`npm run test:admin-api` verifica o backend real com o PostgreSQL configurado. Cria e remove um schema isolado com contas fictícias, sem consultar ou modificar contas existentes. O usuário do banco precisa de permissão para criar schemas. Verifica permissões, reset, troca obrigatória, expiração, revogação de sessões, status das contas e preservação das listas.
+`npm run test:admin-api` verifica o backend real com o PostgreSQL configurado. Cria e remove um schema isolado com contas fictícias, sem consultar ou modificar contas existentes. O usuário do banco precisa de permissão para criar schemas. Verifica permissões, reset, troca obrigatória, expiração, revogação de sessões, status das contas, nomes/ordem de ambientes e itens, preservação da data de adição e das listas.
 
 ## Build e execução
 

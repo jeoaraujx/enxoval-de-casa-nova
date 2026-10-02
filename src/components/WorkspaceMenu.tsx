@@ -6,15 +6,20 @@ import {
   Percent,
   Pencil,
   Trash2,
-  RefreshCw,
-  GripVertical,
   LogOut,
   X,
   ChevronRight,
   Users,
 } from "lucide-react";
-import type { AuthUser, EnxovalSummary } from "../types";
+import type {
+  AuthUser,
+  EnxovalSummary,
+  EnxovalCategory,
+  EnxovalItem,
+} from "../types";
 import { useDialogAccessibility } from "../hooks/useDialogAccessibility";
+import { Select } from "./Select";
+import { EnvironmentList } from "./EnvironmentList";
 
 interface WorkspaceMenuProps {
   open: boolean;
@@ -24,9 +29,13 @@ interface WorkspaceMenuProps {
   enxovais: EnxovalSummary[];
   activeEnxoval: EnxovalSummary | null;
   memberCount: number;
-  categoryCount: number;
+  categories: EnxovalCategory[];
+  items: EnxovalItem[];
+  activeCategoryId: string;
+  onSelectCategory: (id: string) => void;
+  onRenameCategory: (category: EnxovalCategory) => void;
+  onReorderCategories: (ids: string[]) => Promise<void>;
   busy: boolean;
-  refreshing: boolean;
   onSwitch: (id: string) => void;
   onCreate: () => void;
   onInvite: () => void;
@@ -34,8 +43,6 @@ interface WorkspaceMenuProps {
   onRename: () => void;
   onDelete: () => void;
   onAddCategory: () => void;
-  onReorder: () => void;
-  onRefresh: () => void;
   onLogout: () => void;
 }
 
@@ -54,13 +61,7 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
   const actions = [
     { label: "Convidar pessoas", icon: UserPlus, action: props.onInvite },
     { label: "Descontos e cashback", icon: Percent, action: props.onDiscounts },
-    { label: "Adicionar categoria", icon: Plus, action: props.onAddCategory },
-    {
-      label: "Reordenar categorias",
-      icon: GripVertical,
-      action: props.onReorder,
-      disabled: props.categoryCount < 2,
-    },
+    { label: "Adicionar ambiente", icon: Plus, action: props.onAddCategory },
     ...(props.activeEnxoval?.role === "owner"
       ? [
           {
@@ -70,13 +71,6 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
           },
         ]
       : []),
-    {
-      label: "Atualizar enxoval",
-      icon: RefreshCw,
-      action: props.onRefresh,
-      disabled: props.refreshing,
-      spinning: props.refreshing,
-    },
   ];
   return (
     <div className="workspace-menu-layer">
@@ -117,20 +111,17 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
               <Home size={17} /> Seus enxovais
             </label>
             {props.enxovais.length > 0 ? (
-              <select
+              <Select
                 id="menu-enxoval"
+                autoFocus
                 value={props.activeEnxoval?.id ?? ""}
                 disabled={props.busy}
-                onChange={(event) =>
-                  run(() => props.onSwitch(event.target.value))
-                }
-              >
-                {props.enxovais.map((enxoval) => (
-                  <option key={enxoval.id} value={enxoval.id}>
-                    {enxoval.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(id) => run(() => props.onSwitch(id))}
+                options={props.enxovais.map((enxoval) => ({
+                  value: enxoval.id,
+                  label: enxoval.name,
+                }))}
+              />
             ) : (
               <p>Vamos começar seu primeiro enxoval?</p>
             )}
@@ -153,27 +144,42 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
           </section>
           {hasEnxoval && (
             <section
+              className="workspace-menu-environments"
+              aria-label="Ambientes do menu lateral"
+            >
+              <h3>Ambientes</h3>
+              <p>Segure a alça e arraste para mudar a ordem.</p>
+              <EnvironmentList
+                categories={props.categories}
+                items={props.items}
+                activeId={props.activeCategoryId}
+                disabled={props.busy}
+                onSelect={(id) => run(() => props.onSelectCategory(id))}
+                onRename={(category) =>
+                  run(() => props.onRenameCategory(category))
+                }
+                onReorder={props.onReorderCategories}
+              />
+            </section>
+          )}
+          {hasEnxoval && (
+            <section
               className="workspace-menu-actions"
               aria-label="Organizar enxoval"
             >
               <h3>Organizar enxoval</h3>
-              {actions.map(
-                ({ label, icon: Icon, action, disabled, spinning }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    disabled={props.busy || disabled}
-                    onClick={() => run(action)}
-                  >
-                    <Icon
-                      size={19}
-                      className={spinning ? "animate-spin" : ""}
-                    />
-                    <span>{label}</span>
-                    <ChevronRight size={16} />
-                  </button>
-                ),
-              )}
+              {actions.map(({ label, icon: Icon, action }) => (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={props.busy}
+                  onClick={() => run(action)}
+                >
+                  <Icon size={19} />
+                  <span>{label}</span>
+                  <ChevronRight size={16} />
+                </button>
+              ))}
             </section>
           )}
           {props.activeEnxoval?.role === "owner" && (

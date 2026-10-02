@@ -156,7 +156,7 @@ test("workspaces and categories can be created and safely removed in demo", asyn
     .getByRole("button", { name: "Adicionar item", exact: true })
     .click();
   await page.getByLabel("Nome do produto").fill("Mesa de trabalho");
-  await page.getByLabel("Nome da categoria").fill("Escritório");
+  await page.getByLabel("Nome do ambiente").fill("Escritório");
   await page.getByRole("button", { name: "Adicionar à lista" }).click();
   await expect(
     page.getByRole("heading", { name: "Escritório", exact: true }),
@@ -212,24 +212,44 @@ test("mobile menu, swipe, refresh and bottom navigation remain usable", async ({
   ).toHaveAttribute("aria-expanded", "false");
   await page.goto("/demo");
   const box = await page.locator(".item-name").first().boundingBox();
-  await page.mouse.move(box!.x + 140, box!.y + 5);
+  await page.mouse.move(box!.x + box!.width - 5, box!.y + 5);
   await page.mouse.down();
-  await page.mouse.move(box!.x + 15, box!.y + 5, { steps: 8 });
+  await page.mouse.move(Math.max(10, box!.x - 80), box!.y + 5, { steps: 8 });
   await page.mouse.up();
   await expect(
     page.getByRole("heading", { name: "Quarto", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Abrir menu do enxoval" }).click();
-  await page
-    .getByRole("button", { name: "Atualizar enxoval", exact: true })
-    .click();
+  await expect(
+    page.getByRole("button", { name: "Atualizar enxoval", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Fechar menu do enxoval" }).click();
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    const target = document.querySelector(".list-section-heading h2")!;
+    const touch = (y: number) =>
+      new Touch({ identifier: 1, target, clientX: 150, clientY: y });
+    target.dispatchEvent(
+      new TouchEvent("touchstart", { bubbles: true, touches: [touch(360)] }),
+    );
+    target.dispatchEvent(
+      new TouchEvent("touchmove", {
+        bubbles: true,
+        cancelable: true,
+        touches: [touch(540)],
+      }),
+    );
+    target.dispatchEvent(
+      new TouchEvent("touchend", { bubbles: true, touches: [] }),
+    );
+  });
   await expect(
     page.getByRole("heading", { name: "Quarto", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Visão geral", exact: true }).click();
   await expect(page.getByText("Seu lar está ganhando forma.")).toBeVisible();
   const header = page.locator(".mobile-workspace-header");
-  await expect(header.getByRole("button")).toHaveCount(1);
+  await expect(header.getByRole("button")).toHaveCount(2);
   await expect(header).not.toContainText("Total gasto");
   await page.evaluate(() => window.scrollTo(0, 250));
   await expect(header).not.toContainText("Total gasto");
@@ -346,16 +366,19 @@ test("discounts and keyboard category reordering persist", async ({ page }) => {
   await page.getByRole("button", { name: "Somar ajuste na prévia" }).click();
   await page.getByRole("button", { name: "Salvar ajuste" }).click();
   await expect(page.locator(".workspace-stats")).toContainText("R$ 1.532,30");
-  await page.getByRole("button", { name: "Organizar ambientes" }).click();
-  await page.getByRole("button", { name: "Mover Quarto para cima" }).click();
-  await page.getByRole("button", { name: "Salvar ordem" }).click();
-  await expect(page.locator(".sidebar-rooms button").first()).toContainText(
-    "Quarto",
-  );
+  const handle = page
+    .locator(".sidebar-rooms")
+    .getByRole("button", { name: "Reordenar Quarto", exact: true });
+  await handle.focus();
+  await handle.press("ArrowUp");
+  await expect(handle).toBeEnabled();
+  await expect(
+    page.locator(".sidebar-rooms .environment-select").first(),
+  ).toContainText("Quarto");
   await page.reload();
-  await expect(page.locator(".sidebar-rooms button").first()).toContainText(
-    "Quarto",
-  );
+  await expect(
+    page.locator(".sidebar-rooms .environment-select").first(),
+  ).toContainText("Quarto");
   await expect(page.locator(".workspace-stats")).toContainText("R$ 1.532,30");
 });
 test("workspace drawer groups mobile actions, traps focus and returns to its trigger", async ({
@@ -364,7 +387,7 @@ test("workspace drawer groups mobile actions, traps focus and returns to its tri
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/demo");
   const trigger = page.getByRole("button", { name: "Abrir menu do enxoval" });
-  await expect(page.locator(".mobile-header-title-row button")).toHaveCount(1);
+  await expect(page.locator(".mobile-header-title-row button")).toHaveCount(2);
   await expect(
     page.getByRole("button", { name: "Excluir enxoval", exact: true }),
   ).toHaveCount(0);
@@ -387,7 +410,7 @@ test("workspace drawer groups mobile actions, traps focus and returns to its tri
   await expect(menu).toHaveCount(0);
   await expect(trigger).toBeFocused();
   await trigger.click();
-  await page.getByRole("button", { name: "Editar nome do enxoval" }).click();
+  await menu.getByRole("button", { name: "Editar nome do enxoval" }).click();
   await expect(menu).toHaveCount(0);
   const rename = page.getByRole("dialog");
   await expect(rename).toContainText("Editar enxoval");
@@ -427,12 +450,12 @@ test("mobile drawer switches workspaces, creates categories and keeps destructiv
     .click();
   await open();
   await page
-    .getByRole("button", { name: "Adicionar categoria", exact: true })
+    .getByRole("button", { name: "Adicionar ambiente", exact: true })
     .click();
   const category = page.getByRole("dialog");
   await category.getByRole("textbox").fill("Varanda");
   await category
-    .getByRole("button", { name: "Criar categoria", exact: true })
+    .getByRole("button", { name: "Criar ambiente", exact: true })
     .click();
   await expect(page.locator(".mobile-workspace-header")).toContainText(
     "Varanda",
@@ -442,7 +465,10 @@ test("mobile drawer switches workspaces, creates categories and keeps destructiv
     name: "Seus enxovais",
     exact: true,
   });
-  await picker.selectOption({ label: "Nosso primeiro apê" });
+  await picker.click();
+  await page
+    .getByRole("option", { name: "Nosso primeiro apê", exact: true })
+    .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator(".mobile-header-title h1")).toHaveText(
     "Nosso primeiro apê",

@@ -177,6 +177,127 @@ try {
     "PASS: gestão restrita ao admin, configuração obrigatória, proteção de origem e listagem sem hashes.",
   );
 
+  assert.ok(item.createdAt);
+  const originalCreatedAt = item.createdAt;
+  const secondItem = (
+    await customer.call("/items", "POST", {
+      name: "Tapete preservado",
+      enxovalId: workspace.enxoval.id,
+      categoryId: item.categoryId,
+    })
+  ).data.item;
+  const orderBody = {
+    enxovalId: workspace.enxoval.id,
+    categoryId: item.categoryId,
+    itemIds: [secondItem.id, item.id],
+  };
+  assert.equal(
+    (await outsider.call("/items/order", "PATCH", orderBody)).status,
+    401,
+  );
+  assert.equal(
+    (
+      await customer.call("/items/order", "PATCH", {
+        ...orderBody,
+        itemIds: [item.id, item.id],
+      })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await customer.call("/items/order", "PATCH", {
+        ...orderBody,
+        itemIds: [item.id],
+      })
+    ).status,
+    409,
+  );
+  const reordered = await customer.call("/items/order", "PATCH", orderBody);
+  assert.equal(reordered.status, 200);
+  assert.deepEqual(
+    reordered.data.map((item) => item.id),
+    orderBody.itemIds,
+  );
+  const editedItem = await customer.call(`/items/${item.id}`, "PATCH", {
+    name: "Toalha editada na lista",
+    priceCents: 1990,
+  });
+  assert.equal(editedItem.status, 200);
+  assert.equal(editedItem.data.createdAt, originalCreatedAt);
+  const otherCategory = (
+    await customer.call("/categories", "POST", {
+      enxovalId: workspace.enxoval.id,
+      name: "Quarto",
+    })
+  ).data;
+  assert.equal(
+    (
+      await customer.call(`/categories/${item.categoryId}`, "PATCH", {
+        enxovalId: workspace.enxoval.id,
+        name: "Quarto",
+      })
+    ).status,
+    409,
+  );
+  assert.equal(
+    (
+      await customer.call(`/categories/${item.categoryId}`, "PATCH", {
+        enxovalId: workspace.enxoval.id,
+        name: "   ",
+      })
+    ).status,
+    400,
+  );
+  const renamed = await customer.call(
+    `/categories/${item.categoryId}`,
+    "PATCH",
+    { enxovalId: workspace.enxoval.id, name: "Banheiro planejado" },
+  );
+  assert.equal(renamed.status, 200);
+  assert.equal(
+    (await customer.call(`/enxovais/${workspace.enxoval.id}`)).data.items.find(
+      (value) => value.id === item.id,
+    ).category,
+    "Banheiro planejado",
+  );
+  assert.equal(
+    (
+      await customer.call("/items/order", "PATCH", {
+        ...orderBody,
+        categoryId: otherCategory.id,
+      })
+    ).status,
+    409,
+  );
+  assert.equal(
+    (
+      await outsider.call("/auth/register", "POST", {
+        name: "Outro usuário",
+        email: "outro@example.invalid",
+        password: originalPassword,
+      })
+    ).status,
+    201,
+  );
+  assert.equal(
+    (await outsider.call("/items/order", "PATCH", orderBody)).status,
+    404,
+  );
+  assert.equal(
+    (
+      await outsider.call(`/categories/${item.categoryId}`, "PATCH", {
+        enxovalId: workspace.enxoval.id,
+        name: "Acesso indevido",
+      })
+    ).status,
+    404,
+  );
+  assert.equal((await outsider.call("/auth/logout", "POST")).status, 204);
+  console.log(
+    "PASS: nomes e ordem persistidos, data de adição preservada, dados fora do ambiente e de outra conta rejeitados.",
+  );
+
   const reset = await admin.call(`/admin/users/${id}/reset-password`, "POST");
   assert.equal(reset.status, 200);
   const temp = reset.data.temporaryPassword;
@@ -262,7 +383,7 @@ try {
   });
   assert.equal(change.status, 200);
   assert.equal(change.data.user.mustChangePassword, false);
-  assert.equal(change.data.items[0].id, item.id);
+  assert.ok(change.data.items.some((value) => value.id === item.id));
   const oldSession = await fetch(`${base}/api/bootstrap`, {
     headers: { Cookie: restrictedCookie },
   });
@@ -376,7 +497,8 @@ try {
     409,
   );
   assert.equal(
-    (await admin.call("/admin/users")).data.users[0].isActive,
+    (await admin.call("/admin/users")).data.users.find((user) => user.id === id)
+      .isActive,
     false,
   );
   assert.equal(

@@ -73,6 +73,7 @@ function seed(): DemoStore {
           description:
             i === 0 ? "Cerâmica off-white, conjunto de 6 peças." : "",
           sortOrder: i,
+          createdAt: "2026-09-20T12:00:00.000Z",
           updatedAt: "2026-09-30T12:00:00.000Z",
         })),
       },
@@ -174,6 +175,7 @@ export async function demoRequest<T>(
             link: "",
             description: "",
             sortOrder,
+            createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           }))
         : [],
@@ -200,7 +202,22 @@ export async function demoRequest<T>(
       (w) => w.enxoval.id === body.enxovalId,
     );
     if (!workspace) throw new Error("Enxoval não encontrado.");
-    if (method === "PATCH") {
+    if (method === "PATCH" && url.pathname !== "/api/categories/order") {
+      const categoryId = url.pathname.split("/")[3];
+      const category = workspace.categories.find((c) => c.id === categoryId);
+      const name = String(body.name ?? "").trim();
+      if (!category || !name)
+        throw new Error("Ambiente não encontrado ou nome inválido.");
+      if (
+        workspace.categories.some((c) => c.id !== categoryId && c.name === name)
+      )
+        throw new Error("Já existe um ambiente com esse nome.");
+      category.name = name;
+      workspace.items.forEach((item) => {
+        if (item.categoryId === categoryId) item.category = name;
+      });
+      result = category;
+    } else if (method === "PATCH") {
       workspace.categories = body.categoryIds.map(
         (categoryId: string, sortOrder: number) => ({
           ...workspace.categories.find((c) => c.id === categoryId),
@@ -217,6 +234,27 @@ export async function demoRequest<T>(
       workspace.categories.push(category);
       result = category;
     }
+  } else if (url.pathname === "/api/items/order" && method === "PATCH") {
+    const workspace = data.workspaces.find(
+      (w) => w.enxoval.id === body.enxovalId,
+    );
+    if (!workspace) throw new Error("Enxoval não encontrado.");
+    const actual = workspace.items.filter(
+      (item) => item.categoryId === body.categoryId,
+    );
+    if (
+      !Array.isArray(body.itemIds) ||
+      body.itemIds.length !== actual.length ||
+      new Set(body.itemIds).size !== actual.length ||
+      body.itemIds.some((id: string) => !actual.some((item) => item.id === id))
+    )
+      throw new Error("A lista mudou. Atualize os itens antes de reordenar.");
+    body.itemIds.forEach((id: string, sortOrder: number) => {
+      workspace.items.find((item) => item.id === id)!.sortOrder = sortOrder;
+    });
+    result = workspace.items
+      .filter((item) => item.categoryId === body.categoryId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
   } else if (url.pathname === "/api/items" && method === "POST") {
     const workspace = data.workspaces.find(
       (w) => w.enxoval.id === body.enxovalId,
@@ -231,7 +269,7 @@ export async function demoRequest<T>(
       };
       workspace.categories.push(category);
     }
-    if (!category) throw new Error("Escolha uma categoria.");
+    if (!category) throw new Error("Escolha um ambiente.");
     const item = {
       id: id(),
       name: body.name,
@@ -242,6 +280,7 @@ export async function demoRequest<T>(
       link: "",
       description: "",
       sortOrder: workspace.items.length,
+      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     workspace.items.push(item);

@@ -34,7 +34,7 @@ const faqs = [
   ],
   [
     "Funciona no celular e no computador?",
-    "Sim. A interface se adapta à sua tela. No celular, você pode deslizar entre categorias, puxar para atualizar e adicionar um atalho à tela inicial pelo navegador.",
+    "Sim. A interface se adapta à sua tela. No celular, você pode deslizar entre ambientes, puxar para atualizar e adicionar um atalho à tela inicial pelo navegador.",
   ],
   [
     "Posso guardar links de qualquer loja?",

@@ -5,7 +5,8 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Reorder } from "motion/react";
+import { motion } from "motion/react";
+
 import {
   Plus,
   Home,
@@ -19,7 +20,6 @@ import {
   Trash2,
   RefreshCw,
   Search,
-  GripVertical,
   ExternalLink,
   Minus,
   SlidersHorizontal,
@@ -27,9 +27,8 @@ import {
   ListChecks,
   ArrowUpRight,
   ChevronRight,
-  ArrowUp,
-  ArrowDown,
   Menu,
+  Download,
 } from "lucide-react";
 import type {
   AuthUser,
@@ -52,10 +51,16 @@ import {
   inviteMember as inviteMemberRequest,
   logout as logoutRequest,
   reorderCategories as reorderCategoriesRequest,
+  renameCategory as renameCategoryRequest,
+  reorderItems as reorderItemsRequest,
   updateEnxoval as updateEnxovalRequest,
   updateItem as updateItemRequest,
 } from "./api";
 import { ItemRow } from "./components/ItemRow";
+import { Select } from "./components/Select";
+import { SortableList } from "./components/SortableList";
+import { EnvironmentList } from "./components/EnvironmentList";
+import { exportItems } from "./utils/export";
 import { AddItemModal } from "./components/AddItemModal";
 import { LandingPage } from "./components/LandingPage";
 import { AuthPage } from "./components/AuthPage";
@@ -67,7 +72,7 @@ import { Dialog } from "./components/Dialog";
 import { RequiredPasswordPage } from "./components/RequiredPasswordPage";
 
 type DiscountOperation = "add" | "subtract";
-type ItemSortMode = "name" | "updated";
+type ItemSortMode = "manual" | "name" | "updated";
 type CategorySwipeDirection = "next" | "previous";
 
 const APP_NAME = "Larume";
@@ -170,7 +175,7 @@ export default function App() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [showOnlyPricedItems, setShowOnlyPricedItems] = useState(false);
   const [showOnlyCheckedItems, setShowOnlyCheckedItems] = useState(false);
-  const [itemSortMode, setItemSortMode] = useState<ItemSortMode>("name");
+  const [itemSortMode, setItemSortMode] = useState<ItemSortMode>("manual");
   const [categorySwipeOffset, setCategorySwipeOffset] = useState(0);
   const [categorySwipeDirection, setCategorySwipeDirection] =
     useState<CategorySwipeDirection | null>(null);
@@ -182,7 +187,6 @@ export default function App() {
   };
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
-  const [isReorderCategoriesOpen, setIsReorderCategoriesOpen] = useState(false);
   const [isCreateEnxovalOpen, setIsCreateEnxovalOpen] = useState(false);
   const [isRenameEnxovalOpen, setIsRenameEnxovalOpen] = useState(false);
   const [isDeleteEnxovalOpen, setIsDeleteEnxovalOpen] = useState(false);
@@ -201,7 +205,10 @@ export default function App() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [newEnxovalName, setNewEnxovalName] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [categoryOrder, setCategoryOrder] = useState<EnxovalCategory[]>([]);
+  const [categoryToRename, setCategoryToRename] =
+    useState<EnxovalCategory | null>(null);
+  const [renameCategoryName, setRenameCategoryName] = useState("");
+  const [isOrdering, setIsOrdering] = useState(false);
   const [newEnxovalUseDefaultTemplate, setNewEnxovalUseDefaultTemplate] =
     useState(true);
   const [renameEnxovalName, setRenameEnxovalName] = useState("");
@@ -315,12 +322,7 @@ export default function App() {
     }
 
     if (isCreateCategoryOpen) {
-      document.title = makeTitle("Nova categoria");
-      return;
-    }
-
-    if (isReorderCategoriesOpen) {
-      document.title = makeTitle("Reordenar categorias");
+      document.title = makeTitle("Novo ambiente");
       return;
     }
 
@@ -381,7 +383,6 @@ export default function App() {
     isInviteOpen,
     isLoading,
     isRenameEnxovalOpen,
-    isReorderCategoriesOpen,
     isWorkspaceLoading,
     itemToDelete,
     itemToEdit,
@@ -446,12 +447,7 @@ export default function App() {
   }, [activeCategoryId, activeEnxoval?.id, isRefreshing]);
 
   useEffect(() => {
-    if (
-      !user ||
-      !isHeaderMobile ||
-      isReorderCategoriesOpen ||
-      isWorkspaceMenuOpen
-    ) {
+    if (!user || !isHeaderMobile || isWorkspaceMenuOpen) {
       pullStartYRef.current = null;
       pullLastDistanceRef.current = 0;
       setPullDistance(0);
@@ -537,14 +533,7 @@ export default function App() {
       window.removeEventListener("touchend", handleTouchEnd);
       window.removeEventListener("touchcancel", resetPull);
     };
-  }, [
-    handleRefresh,
-    isWorkspaceMenuOpen,
-    isHeaderMobile,
-    isRefreshing,
-    isReorderCategoriesOpen,
-    user,
-  ]);
+  }, [handleRefresh, isWorkspaceMenuOpen, isHeaderMobile, isRefreshing, user]);
 
   const activeCategory =
     categories.find((category) => category.id === activeCategoryId) ??
@@ -556,7 +545,7 @@ export default function App() {
   const activeFilterCount =
     (showOnlyPricedItems ? 1 : 0) +
     (showOnlyCheckedItems ? 1 : 0) +
-    (itemSortMode !== "name" ? 1 : 0);
+    (itemSortMode !== "manual" ? 1 : 0);
   const categoryById = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
     [categories],
@@ -598,6 +587,11 @@ export default function App() {
     });
 
     return [...narrowedItems].sort((firstItem, secondItem) => {
+      if (itemSortMode === "manual")
+        return (
+          firstItem.sortOrder - secondItem.sortOrder ||
+          firstItem.name.localeCompare(secondItem.name, "pt-BR")
+        );
       if (itemSortMode === "updated") {
         const updatedDifference =
           getUpdatedAtTime(secondItem) - getUpdatedAtTime(firstItem);
@@ -633,8 +627,8 @@ export default function App() {
     : isShowingLatestChanges
       ? "Últimas alterações"
       : hasItemFilters
-        ? `Itens filtrados em ${activeCategory?.name ?? "categoria"}`
-        : `Progresso de ${activeCategory?.name ?? "categoria"}`;
+        ? `Itens filtrados em ${activeCategory?.name ?? "ambiente"}`
+        : `Progresso de ${activeCategory?.name ?? "ambiente"}`;
   const listCounterText =
     !isSearching && !isShowingLatestChanges && !hasItemFilters
       ? `${filteredCheckedCount} de ${filteredItems.length} itens`
@@ -737,12 +731,6 @@ export default function App() {
         marginTop: `${18 - 6 * visibleProgress}px`,
       }
     : undefined;
-  const categoryButtonStyle = isHeaderMobile
-    ? {
-        paddingTop: `${8 - 2 * visibleProgress}px`,
-        paddingBottom: `${8 - 2 * visibleProgress}px`,
-      }
-    : undefined;
   const editItemProductUrl = getProductUrl(editItemLink);
 
   const startCategorySwipeAnimation = useCallback(
@@ -804,7 +792,8 @@ export default function App() {
       const target = event.target;
       if (
         target instanceof Element &&
-        target.closest('button, input, textarea, select, a, [role="button"]')
+        target.closest('button, input, textarea, select, a, [role="button"]') &&
+        !target.closest(".item-title-button")
       )
         return;
 
@@ -816,7 +805,8 @@ export default function App() {
         isCanceled: false,
       };
       setCategorySwipeOffset(0);
-      event.currentTarget.setPointerCapture(event.pointerId);
+      if (!(target instanceof Element && target.closest(".item-title-button")))
+        event.currentTarget.setPointerCapture(event.pointerId);
     },
     [canSwipeCategories],
   );
@@ -841,6 +831,7 @@ export default function App() {
 
         if (absX < 16 || absX < absY * 1.2) return;
         swipe.isSwiping = true;
+        event.currentTarget.setPointerCapture(event.pointerId);
       }
 
       event.preventDefault();
@@ -888,6 +879,7 @@ export default function App() {
   );
 
   const handleEnxovalChange = async (enxovalId: string) => {
+    if (isOrdering) return;
     if (!enxovalId || enxovalId === activeEnxoval?.id) return;
 
     setIsWorkspaceLoading(true);
@@ -1075,40 +1067,6 @@ export default function App() {
     }
   };
 
-  const handleSaveCategoryOrder = async () => {
-    if (!activeEnxoval) return;
-
-    setIsDialogSubmitting(true);
-    setDialogError("");
-
-    try {
-      const reorderedCategories = await reorderCategoriesRequest(
-        activeEnxoval.id,
-        categoryOrder.map((category) => category.id),
-      );
-      setCategories(reorderedCategories);
-      setCategoryOrder(reorderedCategories);
-
-      if (
-        !reorderedCategories.some(
-          (category) => category.id === activeCategoryId,
-        )
-      ) {
-        setActiveCategoryId(reorderedCategories[0]?.id || "");
-      }
-
-      setIsReorderCategoriesOpen(false);
-    } catch (err) {
-      setDialogError(
-        err instanceof Error
-          ? err.message
-          : "Não foi possível reordenar as categorias.",
-      );
-    } finally {
-      setIsDialogSubmitting(false);
-    }
-  };
-
   const handleCreateCategory = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!activeEnxoval) return;
@@ -1143,7 +1101,7 @@ export default function App() {
       setDialogError(
         err instanceof Error
           ? err.message
-          : "Não foi possível criar a categoria.",
+          : "Não foi possível criar o ambiente.",
       );
     } finally {
       setIsDialogSubmitting(false);
@@ -1290,12 +1248,6 @@ export default function App() {
     setIsCreateCategoryOpen(true);
   };
 
-  const openReorderCategories = () => {
-    setDialogError("");
-    setCategoryOrder(categories);
-    setIsReorderCategoriesOpen(true);
-  };
-
   const openRenameEnxoval = () => {
     if (!activeEnxoval) return;
     setDialogError("");
@@ -1374,6 +1326,117 @@ export default function App() {
     setIsInviteOpen(true);
   };
 
+  const selectEnvironment = (id: string) => {
+    setActiveCategoryId(id);
+    setWorkspaceView("list");
+    setSearchQuery("");
+    setItemSortMode("manual");
+  };
+  const commitEnvironmentOrder = async (ids: string[]) => {
+    if (!activeEnxoval || isOrdering)
+      throw new Error("Aguarde a operação atual.");
+    setIsOrdering(true);
+    setError("");
+    try {
+      setCategories(await reorderCategoriesRequest(activeEnxoval.id, ids));
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível salvar a ordem dos ambientes.",
+      );
+      throw err;
+    } finally {
+      setIsOrdering(false);
+    }
+  };
+  const commitItemOrder = async (ids: string[]) => {
+    if (!activeEnxoval || !activeCategory || isOrdering)
+      throw new Error("Aguarde a operação atual.");
+    setIsOrdering(true);
+    setError("");
+    try {
+      const ordered = await reorderItemsRequest(
+        activeEnxoval.id,
+        activeCategory.id,
+        ids,
+      );
+      const byId = new Map(ordered.map((item) => [item.id, item]));
+      setItems((current) => current.map((item) => byId.get(item.id) ?? item));
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível salvar a ordem dos itens.",
+      );
+      throw err;
+    } finally {
+      setIsOrdering(false);
+    }
+  };
+  const openRenameCategory = (category: EnxovalCategory) => {
+    setCategoryToRename(category);
+    setRenameCategoryName(category.name);
+    setDialogError("");
+  };
+  const handleRenameCategory = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!activeEnxoval || !categoryToRename) return;
+    setIsDialogSubmitting(true);
+    setDialogError("");
+    try {
+      const saved = await renameCategoryRequest(
+        activeEnxoval.id,
+        categoryToRename.id,
+        renameCategoryName.trim(),
+      );
+      setCategories((current) =>
+        current.map((category) =>
+          category.id === saved.id ? saved : category,
+        ),
+      );
+      setItems((current) =>
+        current.map((item) =>
+          item.categoryId === saved.id
+            ? { ...item, category: saved.name }
+            : item,
+        ),
+      );
+      setCategoryToRename(null);
+    } catch (err) {
+      setDialogError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível editar o ambiente.",
+      );
+    } finally {
+      setIsDialogSubmitting(false);
+    }
+  };
+  const renderItem = (item: EnxovalItem, dragHandle?: React.ReactNode) => (
+    <ItemRow
+      key={item.id}
+      item={item}
+      categories={categories}
+      dragHandle={dragHandle}
+      categoryName={
+        showItemCategory
+          ? (categoryById.get(item.categoryId)?.name ?? item.category)
+          : undefined
+      }
+      showUpdatedAt={isShowingLatestChanges}
+      updatedAtLabel={formatUpdatedAt(item.updatedAt)}
+      onUpdate={updateItem}
+      onDelete={openDeleteItem}
+      onEdit={openEditItem}
+    />
+  );
+  const canReorderItems =
+    itemSortMode === "manual" &&
+    !isSearching &&
+    !hasItemFilters &&
+    Boolean(activeCategory);
+
   const handleLogout = async () => {
     await logoutRequest().catch(() => undefined);
     window.history.replaceState({}, "", "/");
@@ -1392,7 +1455,13 @@ export default function App() {
   };
 
   if (!isLoading && user?.mustChangePassword)
-    return <RequiredPasswordPage user={user} onChanged={applyBootstrap} onLogout={handleLogout} />;
+    return (
+      <RequiredPasswordPage
+        user={user}
+        onChanged={applyBootstrap}
+        onLogout={handleLogout}
+      />
+    );
 
   if (window.location.pathname === "/")
     return <LandingPage signedIn={Boolean(user)} />;
@@ -1435,19 +1504,20 @@ export default function App() {
           </a>
           <div className="workspace-picker">
             <span>MEU CANTINHO</span>
-            <select
-              aria-label="Selecionar enxoval"
+            <Select
+              ariaLabel="Selecionar enxoval"
               value={activeEnxoval?.id ?? ""}
-              onChange={(e) => void handleEnxovalChange(e.target.value)}
-              disabled={isWorkspaceLoading}
-            >
-              {!hasEnxoval && <option value="">Seu próximo começo</option>}
-              {enxovais.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.name}
-                </option>
-              ))}
-            </select>
+              options={
+                hasEnxoval
+                  ? enxovais.map((enxoval) => ({
+                      value: enxoval.id,
+                      label: enxoval.name,
+                    }))
+                  : [{ value: "", label: "Seu próximo começo" }]
+              }
+              onChange={(id) => void handleEnxovalChange(id)}
+              disabled={isWorkspaceLoading || isOrdering}
+            />
           </div>
           <nav
             className="workspace-navigation"
@@ -1469,44 +1539,27 @@ export default function App() {
           <div className="sidebar-section-title">
             AMBIENTES{" "}
             <button
-              aria-label="Adicionar categoria"
+              aria-label="Adicionar ambiente"
               onClick={openCreateCategory}
               disabled={!hasEnxoval}
             >
               <Plus size={16} />
             </button>
           </div>
-          <nav className="sidebar-rooms" aria-label="Ambientes">
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                className={
-                  activeCategoryId === cat.id && workspaceView === "list"
-                    ? "active"
-                    : ""
-                }
-                onClick={() => {
-                  setActiveCategoryId(cat.id);
-                  setWorkspaceView("list");
-                  setSearchQuery("");
-                  setItemSortMode("name");
-                }}
-              >
-                <RoomIcon name={cat.name} />
-                <span>{cat.name}</span>
-                <small>
-                  {items.filter((i) => i.categoryId === cat.id).length}
-                </small>
-              </button>
-            ))}
-          </nav>
-          <button
-            className="sidebar-reorder"
-            disabled={categories.length < 2}
-            onClick={openReorderCategories}
+          <nav
+            className="sidebar-rooms"
+            aria-label="Ambientes da barra lateral"
           >
-            <GripVertical size={14} /> Organizar ambientes
-          </button>
+            <EnvironmentList
+              categories={categories}
+              items={items}
+              activeId={workspaceView === "list" ? activeCategoryId : undefined}
+              onSelect={selectEnvironment}
+              onRename={openRenameCategory}
+              onReorder={commitEnvironmentOrder}
+              disabled={isWorkspaceLoading || isOrdering}
+            />
+          </nav>
           <div className="sidebar-bottom">
             <div className="sidebar-note">
               <Sparkles size={20} />
@@ -1540,6 +1593,15 @@ export default function App() {
           <span>
             Meu cantinho <ChevronRight size={14} />{" "}
             <h1>{activeEnxoval?.name ?? "Bem-vindo à Larume"}</h1>
+            {activeEnxoval?.role === "owner" && (
+              <button
+                className="title-edit-button"
+                aria-label="Editar nome do enxoval"
+                onClick={openRenameEnxoval}
+              >
+                <Pencil size={15} />
+              </button>
+            )}
           </span>
           <div>
             {hasEnxoval && (
@@ -1609,7 +1671,8 @@ export default function App() {
             />
           </div>
         </div>
-        <header
+        <motion.header
+          layoutRoot
           className="mobile-workspace-header mobile-header-clean sticky top-0 z-20"
           style={headerStyle}
         >
@@ -1618,7 +1681,20 @@ export default function App() {
               <div className="mobile-header-eyebrow" style={eyebrowStyle}>
                 ENXOVAL COMPARTILHADO
               </div>
-              <h1 style={titleStyle}>{activeEnxoval?.name ?? "Meu enxoval"}</h1>
+              <div className="mobile-title-with-edit">
+                <h1 style={titleStyle}>
+                  {activeEnxoval?.name ?? "Meu enxoval"}
+                </h1>
+                {activeEnxoval?.role === "owner" && (
+                  <button
+                    className="title-edit-button"
+                    aria-label="Editar nome do enxoval"
+                    onClick={openRenameEnxoval}
+                  >
+                    <Pencil size={17} />
+                  </button>
+                )}
+              </div>
               {hasEnxoval && workspaceView === "list" && (
                 <div
                   className="mobile-header-collapsed-spent"
@@ -1653,47 +1729,25 @@ export default function App() {
           )}
           {hasEnxoval && workspaceView === "list" && (
             <>
-              <div
+              <motion.div
+                layoutScroll
                 className="max-w-2xl mx-auto mt-5 sm:mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto no-scrollbar transition-[margin] duration-300 ease-out"
                 style={categoryBarStyle}
               >
-                <div className="flex w-max min-w-full items-center gap-2 pb-2">
-                  {categories.map((cat) => {
-                    const catItems = items.filter(
-                      (i) => i.categoryId === cat.id,
-                    );
-                    const catCompleted = catItems.filter(
-                      (i) => i.checked,
-                    ).length;
-
-                    return (
-                      <button
-                        key={cat.id}
-                        onClick={() => {
-                          setActiveCategoryId(cat.id);
-                          setWorkspaceView("list");
-                        }}
-                        style={categoryButtonStyle}
-                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ease-out flex items-center gap-2 ${
-                          activeCategory?.id === cat.id
-                            ? "bg-brand-wood text-white shadow-md"
-                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                        }`}
-                      >
-                        {cat.name}
-                        <span
-                          className={`text-xs px-1.5 py-0.5 rounded-full ${activeCategory?.id === cat.id ? "bg-white/20" : "bg-stone-200"}`}
-                        >
-                          {catCompleted}/{catItems.length}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                <EnvironmentList
+                  categories={categories}
+                  items={items}
+                  activeId={activeCategoryId}
+                  onSelect={selectEnvironment}
+                  onRename={openRenameCategory}
+                  onReorder={commitEnvironmentOrder}
+                  disabled={isWorkspaceLoading || isOrdering}
+                  horizontal
+                />
+              </motion.div>
             </>
           )}
-        </header>
+        </motion.header>
 
         <main id="workspace-main" className="workspace-main">
           {error && (
@@ -1719,10 +1773,9 @@ export default function App() {
                 setActiveCategoryId(id);
                 setWorkspaceView("list");
                 setSearchQuery("");
-                setItemSortMode("name");
+                setItemSortMode("manual");
               }}
               onInvite={openInvite}
-              onAdd={() => setIsAddModalOpen(true)}
             />
           )}
           {hasEnxoval && workspaceView === "list" ? (
@@ -1738,13 +1791,43 @@ export default function App() {
                         : (activeCategory?.name ?? "Meu enxoval")}
                   </h2>
                   <span>{filteredItems.length} itens</span>
+                  {!isSearching &&
+                    !isShowingLatestChanges &&
+                    activeCategory && (
+                      <button
+                        className="title-edit-button"
+                        aria-label={`Editar ambiente ${activeCategory.name}`}
+                        onClick={() => openRenameCategory(activeCategory)}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                    )}
                 </div>
-                <button
-                  className="button button-dark button-small desktop-add-item"
-                  onClick={() => setIsAddModalOpen(true)}
-                >
-                  <Plus size={17} /> Adicionar item
-                </button>
+                <div className="list-heading-actions">
+                  {activeCategory && (
+                    <button
+                      className="environment-export button button-outline button-small"
+                      aria-label={`Exportar ambiente ${activeCategory.name}`}
+                      onClick={() =>
+                        exportItems(
+                          items.filter(
+                            (item) => item.categoryId === activeCategory.id,
+                          ),
+                          `${activeEnxoval!.name}-${activeCategory.name}`,
+                        )
+                      }
+                    >
+                      <Download size={17} />
+                      <span>Exportar ambiente</span>
+                    </button>
+                  )}
+                  <button
+                    className="button button-dark button-small desktop-add-item"
+                    onClick={() => setIsAddModalOpen(true)}
+                  >
+                    <Plus size={17} /> Adicionar item
+                  </button>
+                </div>
               </div>
               <div className="list-search mb-4 flex items-center gap-2">
                 <div className="relative min-w-0 flex-1">
@@ -1754,10 +1837,10 @@ export default function App() {
                   />
                   <input
                     type="search"
-                    aria-label="Buscar em todas as categorias"
+                    aria-label="Buscar em todos os ambientes"
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Buscar em todas as categorias"
+                    placeholder="Buscar em todos os ambientes"
                     className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-10 pr-11 text-base text-stone-800 shadow-sm outline-none transition focus:border-brand-wood focus:ring-2 focus:ring-brand-wood/30"
                   />
                   {searchQuery && (
@@ -1813,23 +1896,18 @@ export default function App() {
 
                   <div className="space-y-1">
                     {filteredItems.length > 0 ? (
-                      filteredItems.map((item) => (
-                        <ItemRow
-                          key={item.id}
-                          item={item}
-                          categoryName={
-                            showItemCategory
-                              ? (categoryById.get(item.categoryId)?.name ??
-                                item.category)
-                              : undefined
-                          }
-                          showUpdatedAt={isShowingLatestChanges}
-                          updatedAtLabel={formatUpdatedAt(item.updatedAt)}
-                          onUpdate={updateItem}
-                          onDelete={openDeleteItem}
-                          onEdit={openEditItem}
+                      canReorderItems ? (
+                        <SortableList
+                          items={filteredItems}
+                          label={`Itens de ${activeCategory?.name}`}
+                          onCommit={commitItemOrder}
+                          disabled={isOrdering || isWorkspaceLoading}
+                          className="sortable-items"
+                          render={renderItem}
                         />
-                      ))
+                      ) : (
+                        filteredItems.map((item) => renderItem(item))
+                      )
                     ) : (
                       <div className="text-center py-12 px-4">
                         <Sparkles className="w-12 h-12 text-stone-300 mx-auto mb-4" />
@@ -1842,10 +1920,10 @@ export default function App() {
                         </h3>
                         <p className="text-sm text-stone-400">
                           {isSearching
-                            ? "Tente buscar por outro nome, detalhe ou categoria."
+                            ? "Tente buscar por outro nome, detalhe ou ambiente."
                             : activeFilterCount > 0
                               ? "Ajuste os filtros para ver mais itens."
-                              : `Toque no botão abaixo para adicionar itens à categoria ${activeCategory?.name ?? "selecionada"}.`}
+                              : `Toque no botão abaixo para adicionar itens ao ambiente ${activeCategory?.name ?? "selecionado"}.`}
                         </p>
                       </div>
                     )}
@@ -1938,9 +2016,13 @@ export default function App() {
         enxovais={enxovais}
         activeEnxoval={activeEnxoval}
         memberCount={members.length}
-        categoryCount={categories.length}
-        busy={isWorkspaceLoading}
-        refreshing={isRefreshing}
+        categories={categories}
+        items={items}
+        activeCategoryId={activeCategoryId}
+        onSelectCategory={selectEnvironment}
+        onRenameCategory={openRenameCategory}
+        onReorderCategories={commitEnvironmentOrder}
+        busy={isWorkspaceLoading || isOrdering}
         onSwitch={(id) => void handleEnxovalChange(id)}
         onCreate={openCreateEnxoval}
         onInvite={openInvite}
@@ -1948,10 +2030,51 @@ export default function App() {
         onRename={openRenameEnxoval}
         onDelete={openDeleteEnxoval}
         onAddCategory={openCreateCategory}
-        onReorder={openReorderCategories}
-        onRefresh={() => void handleRefresh()}
         onLogout={() => void handleLogout()}
       />
+      <Dialog
+        title="Editar ambiente"
+        isOpen={Boolean(categoryToRename)}
+        onClose={() => setCategoryToRename(null)}
+        busy={isDialogSubmitting}
+      >
+        <form
+          onSubmit={handleRenameCategory}
+          className="environment-rename-form"
+        >
+          <label htmlFor="rename-environment">Nome do ambiente</label>
+          <input
+            id="rename-environment"
+            value={renameCategoryName}
+            onChange={(event) => setRenameCategoryName(event.target.value)}
+            required
+            maxLength={100}
+            disabled={isDialogSubmitting}
+          />
+          {dialogError && (
+            <div role="alert" className="form-error">
+              {dialogError}
+            </div>
+          )}
+          <div>
+            <button
+              type="button"
+              className="button button-outline"
+              disabled={isDialogSubmitting}
+              onClick={() => setCategoryToRename(null)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="button button-dark"
+              disabled={isDialogSubmitting || !renameCategoryName.trim()}
+            >
+              {isDialogSubmitting ? "Salvando…" : "Salvar ambiente"}
+            </button>
+          </div>
+        </form>
+      </Dialog>
       <AddItemModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -2002,7 +2125,14 @@ export default function App() {
             <h4 className="mb-2 text-sm font-semibold text-stone-700">
               Ordenar
             </h4>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => setItemSortMode("manual")}
+                className={`rounded-xl border px-3 py-3 text-left text-sm font-medium ${itemSortMode === "manual" ? "border-brand-wood bg-brand-beige/20 text-brand-dark" : "border-stone-200 bg-white text-stone-600"}`}
+              >
+                Minha ordem
+              </button>
               <button
                 type="button"
                 onClick={() => setItemSortMode("name")}
@@ -2026,7 +2156,7 @@ export default function App() {
               onClick={() => {
                 setShowOnlyPricedItems(false);
                 setShowOnlyCheckedItems(false);
-                setItemSortMode("name");
+                setItemSortMode("manual");
               }}
               disabled={activeFilterCount === 0}
               className="rounded-xl bg-stone-100 px-4 py-2 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-50"
@@ -2044,109 +2174,7 @@ export default function App() {
         </div>
       </Dialog>
       <Dialog
-        title="Reordenar categorias"
-        busy={isDialogSubmitting}
-        isOpen={isReorderCategoriesOpen}
-        onClose={() => setIsReorderCategoriesOpen(false)}
-      >
-        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
-          <Reorder.Group
-            axis="y"
-            values={categoryOrder}
-            onReorder={setCategoryOrder}
-            className="space-y-2"
-          >
-            {categoryOrder.map((category, categoryIndex) => {
-              const categoryItems = items.filter(
-                (item) => item.categoryId === category.id,
-              );
-
-              return (
-                <Reorder.Item
-                  key={category.id}
-                  value={category}
-                  className="flex cursor-grab items-center gap-3 rounded-xl border border-stone-200 bg-white px-3 py-3 text-stone-800 shadow-sm active:cursor-grabbing"
-                  style={{ touchAction: "none" }}
-                >
-                  <GripVertical size={18} className="shrink-0 text-stone-400" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                    {category.name}
-                  </span>
-                  <span className="shrink-0 rounded-full bg-stone-100 px-2 py-1 text-xs font-semibold text-stone-500">
-                    {categoryItems.length}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={`Mover ${category.name} para cima`}
-                    disabled={categoryIndex === 0}
-                    className="icon-button"
-                    onClick={() =>
-                      setCategoryOrder((current) => {
-                        const next = [...current];
-                        [next[categoryIndex - 1], next[categoryIndex]] = [
-                          next[categoryIndex],
-                          next[categoryIndex - 1],
-                        ];
-                        return next;
-                      })
-                    }
-                  >
-                    <ArrowUp size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Mover ${category.name} para baixo`}
-                    disabled={categoryIndex === categoryOrder.length - 1}
-                    className="icon-button"
-                    onClick={() =>
-                      setCategoryOrder((current) => {
-                        const next = [...current];
-                        [next[categoryIndex + 1], next[categoryIndex]] = [
-                          next[categoryIndex],
-                          next[categoryIndex + 1],
-                        ];
-                        return next;
-                      })
-                    }
-                  >
-                    <ArrowDown size={15} />
-                  </button>
-                </Reorder.Item>
-              );
-            })}
-          </Reorder.Group>
-
-          {dialogError && (
-            <p
-              role="alert"
-              className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2"
-            >
-              {dialogError}
-            </p>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setIsReorderCategoriesOpen(false)}
-              disabled={isDialogSubmitting}
-              className="py-4 bg-stone-100 text-stone-700 rounded-xl font-medium text-base hover:bg-stone-200 transition-colors disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleSaveCategoryOrder()}
-              disabled={isDialogSubmitting || !activeEnxoval}
-              className="py-4 bg-brand-dark text-white rounded-xl font-medium text-base hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isDialogSubmitting ? "Salvando..." : "Salvar ordem"}
-            </button>
-          </div>
-        </div>
-      </Dialog>
-      <Dialog
-        title="Nova categoria"
+        title="Novo ambiente"
         busy={isDialogSubmitting}
         isOpen={isCreateCategoryOpen}
         onClose={() => setIsCreateCategoryOpen(false)}
@@ -2157,11 +2185,11 @@ export default function App() {
         >
           <div>
             <label className="block text-sm font-medium text-stone-700 mb-1">
-              Nome da categoria
+              Nome do ambiente
             </label>
             <input
               type="text"
-              aria-label="Nome da categoria"
+              aria-label="Nome do ambiente"
               value={newCategoryName}
               onChange={(event) => setNewCategoryName(event.target.value)}
               placeholder="Ex: Escritório"
@@ -2185,7 +2213,7 @@ export default function App() {
             }
             className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isDialogSubmitting ? "Criando..." : "Criar categoria"}
+            {isDialogSubmitting ? "Criando..." : "Criar ambiente"}
           </button>
         </form>
       </Dialog>
@@ -2447,7 +2475,7 @@ export default function App() {
           <p className="text-sm text-stone-600">
             Esta ação vai excluir o enxoval{" "}
             {activeEnxoval ? `"${activeEnxoval.name}"` : ""}, incluindo
-            categorias, itens e colaboradores.
+            ambientes, itens e colaboradores.
           </p>
 
           {dialogError && (
@@ -2506,21 +2534,18 @@ export default function App() {
 
           <div>
             <label className="block text-sm font-medium text-stone-700 mb-1">
-              Categoria
+              Ambiente
             </label>
-            <select
-              aria-label="Categoria"
+            <Select
+              ariaLabel="Ambiente"
               value={editItemCategoryId}
-              onChange={(event) => setEditItemCategoryId(event.target.value)}
-              disabled={categories.length === 0}
-              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood bg-white disabled:bg-stone-100 disabled:text-stone-400"
-            >
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              onChange={setEditItemCategoryId}
+              disabled={isDialogSubmitting || categories.length === 0}
+              options={categories.map((category) => ({
+                value: category.id,
+                label: category.name,
+              }))}
+            />
           </div>
 
           <div>

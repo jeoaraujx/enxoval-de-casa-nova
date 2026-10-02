@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import type { EnxovalCategory } from "../types";
 import { Dialog } from "./Dialog";
+import { Select } from "./Select";
 
 const NEW_CATEGORY_VALUE = "__new_category__";
 
@@ -44,7 +45,7 @@ export function AddItemModal({
 
     if (!trimmedName) return;
     if (categoryId === NEW_CATEGORY_VALUE && !trimmedCategoryName) {
-      setError("Informe o nome da nova categoria.");
+      setError("Informe o nome do novo ambiente.");
       return;
     }
 
@@ -106,21 +107,18 @@ export function AddItemModal({
             htmlFor="new-item-category"
             className="block text-sm font-medium text-stone-700 mb-1"
           >
-            Categoria
+            Ambiente
           </label>
-          <select
+          <Select
             id="new-item-category"
             value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood bg-white"
-          >
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-            <option value={NEW_CATEGORY_VALUE}>+ Nova categoria</option>
-          </select>
+            onChange={setCategoryId}
+            disabled={isSubmitting}
+            options={[
+              ...categories.map((cat) => ({ value: cat.id, label: cat.name })),
+              { value: NEW_CATEGORY_VALUE, label: "+ Novo ambiente" },
+            ]}
+          />
         </div>
 
         {categoryId === NEW_CATEGORY_VALUE && (
@@ -129,7 +127,7 @@ export function AddItemModal({
               htmlFor="new-item-category-name"
               className="block text-sm font-medium text-stone-700 mb-1"
             >
-              Nome da categoria
+              Nome do ambiente
             </label>
             <input
               id="new-item-category-name"
