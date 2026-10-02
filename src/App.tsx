@@ -64,6 +64,7 @@ import { WorkspaceMenu } from "./components/WorkspaceMenu";
 import { RoomIcon, WorkspaceOverview } from "./components/WorkspaceOverview";
 import { isDemoMode } from "./demo";
 import { Dialog } from "./components/Dialog";
+import { RequiredPasswordPage } from "./components/RequiredPasswordPage";
 
 type DiscountOperation = "add" | "subtract";
 type ItemSortMode = "name" | "updated";
@@ -291,6 +292,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (user?.mustChangePassword) {
+      document.title = makeTitle("Defina sua nova senha");
+      return;
+    }
     if (window.location.pathname === "/") {
       document.title = "Larume — seu lar começa com um plano";
       return;
@@ -1385,6 +1390,9 @@ export default function App() {
     setCategories([]);
     setActiveCategoryId("");
   };
+
+  if (!isLoading && user?.mustChangePassword)
+    return <RequiredPasswordPage user={user} onChanged={applyBootstrap} onLogout={handleLogout} />;
 
   if (window.location.pathname === "/")
     return <LandingPage signedIn={Boolean(user)} />;

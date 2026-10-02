@@ -26,6 +26,25 @@ O comando `dev:preview` **não conecta ao banco nem executa migrações**. A dem
 
 O fluxo de autenticação e a API PostgreSQL originais foram preservados. Compartilhar um enxoval adiciona como membro uma pessoa que já possui conta, usando seu e-mail; não há envio de e-mail implementado.
 
+## Gestão de usuários e recuperação de senha
+
+No `.env` local e nas variáveis do serviço que hospeda o backend, configure:
+
+```dotenv
+ADMIN_LOGIN="seu-login-de-gestao"
+ADMIN_PASSWORD="sua-senha-administrativa-com-12-ou-mais-caracteres"
+```
+
+Reinicie o servidor depois de alterar a configuração. As credenciais ficam apenas no backend; não use prefixo `VITE_`. Sem os dois valores, ou com senha menor que 12 caracteres, o acesso administrativo fica desabilitado. A identidade administrativa é separada das contas de clientes, não cria um enxoval e não aparece na listagem de usuários. Alterar as credenciais invalida as sessões administrativas anteriores.
+
+Abra `/admin` ou use **Acesso administrativo** no login. A gestão permite buscar por nome/e-mail, filtrar ativos, inativos e troca de senha pendente, consultar cadastro/último acesso/quantidade de enxovais e desativar ou reativar contas. “Inativo” significa conta desativada pelo administrador; contas existentes começam ativas. O último acesso começa a ser registrado com esta atualização.
+
+Para recuperar um acesso, encontre a conta ativa, clique em **Redefinir senha** e confirme. Copie a senha temporária exibida e envie diretamente à pessoa. Ela aparece somente nessa resposta, não é persistida em texto puro nem enviada por e-mail. Fechando a janela sem copiá-la, gere outra. A senha temporária vale 24 horas; gerar outra invalida a anterior. O reset substitui o hash, marca `must_change_password` e encerra todas as sessões do cliente.
+
+Ao entrar com a senha temporária, a pessoa vê a tela de nova senha e confirmação (8 a 128 caracteres). Enquanto a troca estiver pendente, a API bloqueia as operações e não retorna os dados do enxoval no bootstrap. A conclusão remove a flag e a expiração, revoga as sessões temporárias e cria uma nova sessão. Desativar uma conta bloqueia login e revoga sessões, preservando listas e itens; reativar não recupera sessões antigas. Contas inativas precisam ser reativadas antes de gerar uma senha temporária.
+
+O admin usa sessão própria em cookie HTTP-only, com duração de 8 horas e token armazenado como hash. As rotas mutáveis exigem JSON e rejeitam origens externas; os logins possuem limite de tentativas por IP em cada processo (10 para admin, 15 para clientes a cada 15 minutos). As novas colunas e a tabela de sessões administrativas são criadas automaticamente pelo servidor completo. A prévia sem banco não habilita a gestão real.
+
 ## Experiência do produto
 
 - Identidade Larume com a casa, os tecidos dobrados e o ramo da referência escolhida, versões para favicon e ícones de tela inicial.
@@ -49,11 +68,14 @@ O fluxo de autenticação e a API PostgreSQL originais foram preservados. Compar
 npm run lint
 npm run test:e2e
 npm run build
+npm run test:admin-api
 ```
 
 A suíte Playwright verifica os fluxos principais, persistência e exportação da demonstração, formulários de autenticação com API simulada, gestos e navegação mobile, foco dos diálogos e verificações automatizadas de acessibilidade com axe. As quatro telas principais são verificadas nas larguras 320, 390, 768, 1024 e 1440 px.
 
 No Windows, os testes usam o Microsoft Edge instalado. Em outros sistemas, instale o navegador de teste com `npx playwright install chromium`. Quando não há servidor local, os testes iniciam o modo de prévia, sem migração de banco; se já há um servidor na porta 3000, ele é reutilizado. As alterações dos testes ficam na demonstração ou em respostas de API simuladas. Os testes de login e cadastro verificam a integração do frontend com respostas simuladas, não a conexão real com PostgreSQL.
+
+`npm run test:admin-api` verifica o backend real com o PostgreSQL configurado. Cria e remove um schema isolado com contas fictícias, sem consultar ou modificar contas existentes. O usuário do banco precisa de permissão para criar schemas. Verifica permissões, reset, troca obrigatória, expiração, revogação de sessões, status das contas e preservação das listas.
 
 ## Build e execução
 
@@ -66,7 +88,7 @@ npm start
 
 ## Escopo comercial desta versão
 
-Os planos e preços da landing page são **ilustrativos**, conforme a proposta visual. Não existem cobrança, checkout, assinatura ou limites de plano aplicados. Recuperação de senha, confirmação de e-mail e pagamentos ainda precisam ser implementados antes de oferecer esses serviços comercialmente.
+Os planos e preços da landing page são **ilustrativos**, conforme a proposta visual. Não existem cobrança, checkout, assinatura ou limites de plano aplicados. A recuperação de senha é assistida pelo administrador, sem envio de e-mail. Recuperação automática por e-mail, confirmação de e-mail e pagamentos não estão implementados.
 
 ## Arquivos de identidade
 

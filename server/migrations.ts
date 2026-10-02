@@ -178,6 +178,20 @@ export async function migrateDatabase() {
       updated_at timestamptz NOT NULL DEFAULT now()
     );
 
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password boolean NOT NULL DEFAULT false;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires_at timestamptz;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
+
+    CREATE TABLE IF NOT EXISTS admin_sessions (
+      id uuid PRIMARY KEY,
+      token_hash text NOT NULL UNIQUE,
+      credential_version text NOT NULL,
+      expires_at timestamptz NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS admin_sessions_expires_at_idx ON admin_sessions(expires_at);
+
     ALTER TABLE enxovais ADD COLUMN IF NOT EXISTS discount_cents integer NOT NULL DEFAULT 0;
     ALTER TABLE enxovais DROP CONSTRAINT IF EXISTS enxovais_discount_cents_non_negative;
     ALTER TABLE enxovais ADD CONSTRAINT enxovais_discount_cents_non_negative CHECK (discount_cents >= 0);

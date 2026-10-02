@@ -42,7 +42,7 @@ export function AuthPage({
         mode === "login"
           ? await login(email.trim(), password)
           : await register(name.trim(), email.trim(), password);
-      window.history.replaceState({}, "", "/app");
+      window.history.replaceState({}, "", data.user.mustChangePassword ? "/change-password" : "/app");
       onAuthenticated(data, {
         promptCreateEnxoval: mode === "register" && data.enxovais.length === 0,
       });
@@ -216,6 +216,7 @@ export function AuthPage({
           <p className="auth-note">
             <ShieldCheck size={15} /> Sem cartão de crédito. No seu tempo.
           </p>
+          <a className="auth-admin-link" href="/admin/login">Acesso administrativo</a>
         </div>
         <span className="auth-bottom">
           Pequenos planos. Grandes começos. <Heart size={12} />

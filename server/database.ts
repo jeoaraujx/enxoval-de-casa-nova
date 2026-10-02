@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import pg from 'pg';
-import type { Pool, QueryResult, QueryResultRow } from 'pg';
+import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 
 dotenv.config({ path: '.env.local', quiet: true });
 dotenv.config({ quiet: true });
@@ -39,3 +39,16 @@ export function getPool() {
 export type Queryable = {
   query<T extends QueryResultRow = QueryResultRow>(text: string, params?: unknown[]): Promise<QueryResult<T>>;
 };
+
+export async function withTransaction<T>(callback: (client: PoolClient) => Promise<T>) {
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally { client.release(); }
+}

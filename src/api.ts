@@ -1,5 +1,6 @@
 import type {
   AuthUser,
+  AdminUser,
   BootstrapData,
   EnxovalCategory,
   EnxovalItem,
@@ -68,6 +69,23 @@ export function register(name: string, email: string, password: string) {
 export function logout() {
   return request<void>("/api/auth/logout", { method: "POST" });
 }
+
+export function changeRequiredPassword(password: string, confirmation: string) {
+  return request<BootstrapData>("/api/auth/change-password", {
+    method: "POST", body: JSON.stringify({ password, confirmation }),
+  });
+}
+
+export const adminSession = () => request<{ login: string }>("/api/admin/session");
+export const adminLogin = (login: string, password: string) => request<{ login: string }>("/api/admin/login", {
+  method: "POST", body: JSON.stringify({ login, password }),
+});
+export const adminLogout = () => request<void>("/api/admin/logout", { method: "POST" });
+export const fetchAdminUsers = () => request<{ users: AdminUser[] }>("/api/admin/users");
+export const resetUserPassword = (id: string) => request<{ temporaryPassword: string; expiresAt: string }>(`/api/admin/users/${encodeURIComponent(id)}/reset-password`, { method: "POST" });
+export const setUserActive = (id: string, isActive: boolean) => request<void>(`/api/admin/users/${encodeURIComponent(id)}/status`, {
+  method: "PATCH", body: JSON.stringify({ isActive }),
+});
 
 export function fetchEnxoval(enxovalId: string) {
   return request<EnxovalWorkspace>(`/api/enxovais/${enxovalId}`);

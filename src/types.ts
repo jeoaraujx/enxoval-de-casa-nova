@@ -39,6 +39,19 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
+  mustChangePassword?: boolean;
+}
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  passwordResetExpiresAt: string | null;
+  createdAt: string;
+  lastLoginAt: string | null;
+  workspaceCount: number;
 }
 
 export interface EnxovalWorkspace {

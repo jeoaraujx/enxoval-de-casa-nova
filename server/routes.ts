@@ -1,11 +1,11 @@
-import { randomBytes, randomUUID, scrypt as scryptCallback, createHash, timingSafeEqual } from 'node:crypto';
-import { promisify } from 'node:util';
+import { randomBytes, randomUUID } from 'node:crypto';
 import express, { Express, Request, Response } from 'express';
 import type { PoolClient } from 'pg';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from '../src/types.ts';
-import { getPool, Queryable } from './database.ts';
+import { getPool, withTransaction, Queryable } from './database.ts';
+import { asyncHandler, cookieOptions, getCookie, hashPassword, hashSessionToken, HttpError, loginRateLimit, protectMutationOrigin, verifyPassword } from './security.ts';
+import { registerAdminRoutes } from './admin.ts';
 
-const scrypt = promisify(scryptCallback);
 const SESSION_COOKIE = 'enxoval_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 
@@ -14,6 +14,9 @@ interface DbUserRow {
   name: string;
   email: string;
   password_hash: string;
+  is_active: boolean;
+  must_change_password: boolean;
+  password_reset_expires_at: Date | null;
 }
 
 interface EnxovalRow {
@@ -66,21 +69,6 @@ interface TemplateItemRow {
   sort_order: number;
 }
 
-class HttpError extends Error {
-  status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
-
-function asyncHandler(handler: (req: Request, res: Response) => Promise<void>) {
-  return (req: Request, res: Response, next: express.NextFunction) => {
-    Promise.resolve(handler(req, res)).catch(next);
-  };
-}
-
 function normalizeEmail(email: unknown) {
   return typeof email === 'string' ? email.trim().toLowerCase() : '';
 }
@@ -93,51 +81,12 @@ function requireText(value: unknown, fieldName: string) {
   return value.trim();
 }
 
-async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString('hex');
-  const derivedKey = await scrypt(password, salt, 64) as Buffer;
-  return `scrypt:${salt}:${derivedKey.toString('hex')}`;
-}
-
-async function verifyPassword(password: string, passwordHash: string) {
-  const [scheme, salt, storedHash] = passwordHash.split(':');
-  if (scheme !== 'scrypt' || !salt || !storedHash) return false;
-
-  const derivedKey = await scrypt(password, salt, 64) as Buffer;
-  const storedKey = Buffer.from(storedHash, 'hex');
-
-  if (derivedKey.length !== storedKey.length) return false;
-  return timingSafeEqual(derivedKey, storedKey);
-}
-
-function hashSessionToken(token: string) {
-  return createHash('sha256').update(token).digest('hex');
-}
-
-function getCookie(req: Request, name: string) {
-  const header = req.headers.cookie;
-  if (!header) return '';
-
-  const cookies = header.split(';').map(cookie => cookie.trim());
-  const prefix = `${name}=`;
-  const match = cookies.find(cookie => cookie.startsWith(prefix));
-  return match ? decodeURIComponent(match.slice(prefix.length)) : '';
-}
-
-function cookieOptions() {
-  return {
-    httpOnly: true,
-    sameSite: 'lax' as const,
-    secure: process.env.COOKIE_SECURE === 'true' || (process.env.NODE_ENV === 'production' && process.env.COOKIE_SECURE !== 'false'),
-    path: '/'
-  };
-}
-
-function mapUser(row: Pick<DbUserRow, 'id' | 'name' | 'email'>): AuthUser {
+function mapUser(row: Pick<DbUserRow, 'id' | 'name' | 'email'> & Partial<Pick<DbUserRow, 'must_change_password'>>): AuthUser {
   return {
     id: row.id,
     name: row.name,
-    email: row.email
+    email: row.email,
+    mustChangePassword: row.must_change_password ?? false
   };
 }
 
@@ -185,22 +134,6 @@ function mapItem(row: ItemRow): EnxovalItem {
     sortOrder: row.sort_order,
     updatedAt: serializeTimestamp(row.updated_at)
   };
-}
-
-async function withTransaction<T>(callback: (client: PoolClient) => Promise<T>) {
-  const client = await getPool().connect();
-
-  try {
-    await client.query('BEGIN');
-    const result = await callback(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
 }
 
 async function fetchEnxovais(queryable: Queryable, userId: string) {
@@ -304,6 +237,7 @@ async function fetchWorkspace(queryable: Queryable, userId: string, enxovalId: s
 }
 
 async function fetchBootstrap(user: AuthUser, requestedEnxovalId?: string): Promise<BootstrapData> {
+  if (user.mustChangePassword) return { user, enxovais: [], activeEnxoval: null, members: [], categories: [], items: [] };
   const enxovais = await fetchEnxovais(getPool(), user.id);
   const activeEnxovalId = requestedEnxovalId ?? enxovais[0]?.id;
   const workspace = activeEnxovalId
@@ -418,12 +352,12 @@ async function createEnxovalForUser(userId: string, name: string, options: { use
   });
 }
 
-async function createSession(res: Response, userId: string) {
+async function createSession(res: Response, userId: string, queryable: Queryable = getPool()) {
   const token = randomBytes(32).toString('base64url');
   const tokenHash = hashSessionToken(token);
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
 
-  await getPool().query(`
+  await queryable.query(`
     INSERT INTO sessions (id, user_id, token_hash, expires_at)
     VALUES ($1, $2, $3, $4)
   `, [randomUUID(), userId, tokenHash, expiresAt]);
@@ -439,19 +373,21 @@ async function getCurrentUser(req: Request) {
   if (!token) return null;
 
   const result = await getPool().query<DbUserRow>(`
-    SELECT u.id, u.name, u.email, u.password_hash
+    SELECT u.id, u.name, u.email, u.password_hash, u.must_change_password
     FROM sessions s
     INNER JOIN users u ON u.id = s.user_id
-    WHERE s.token_hash = $1 AND s.expires_at > now()
+    WHERE s.token_hash = $1 AND s.expires_at > now() AND u.is_active = true
+      AND (NOT u.must_change_password OR u.password_reset_expires_at > now())
     LIMIT 1
   `, [hashSessionToken(token)]);
 
   return result.rows[0] ? mapUser(result.rows[0]) : null;
 }
 
-async function requireCurrentUser(req: Request) {
+async function requireCurrentUser(req: Request, allowPasswordChange = false) {
   const user = await getCurrentUser(req);
   if (!user) throw new HttpError(401, 'Faça login para continuar.');
+  if (user.mustChangePassword && !allowPasswordChange) throw new HttpError(403, 'Defina uma nova senha antes de acessar seu enxoval.');
   return user;
 }
 
@@ -640,13 +576,16 @@ async function reorderCategoriesForUser(userId: string, enxovalId: string, categ
 
 export function registerApiRoutes(app: Express) {
   const router = express.Router();
+  router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+  router.use(protectMutationOrigin);
+  registerAdminRoutes(router);
 
   router.get('/health', (_req, res) => {
     res.json({ ok: true });
   });
 
   router.get('/bootstrap', asyncHandler(async (req, res) => {
-    const user = await requireCurrentUser(req);
+    const user = await requireCurrentUser(req, true);
     const requestedEnxovalId = typeof req.query.enxovalId === 'string' ? req.query.enxovalId : undefined;
     res.json(await fetchBootstrap(user, requestedEnxovalId));
   }));
@@ -659,6 +598,7 @@ export function registerApiRoutes(app: Express) {
       : email.split('@')[0];
 
     if (!email || !email.includes('@')) throw new HttpError(400, 'E-mail inválido.');
+    if (password.length > 128) throw new HttpError(400, 'A senha pode ter no máximo 128 caracteres.');
     if (password.length < 6) throw new HttpError(400, 'A senha precisa ter pelo menos 6 caracteres.');
 
     const passwordHash = await hashPassword(password);
@@ -667,8 +607,8 @@ export function registerApiRoutes(app: Express) {
     try {
       await withTransaction(async client => {
         await client.query(`
-          INSERT INTO users (id, name, email, password_hash)
-          VALUES ($1, $2, $3, $4)
+          INSERT INTO users (id, name, email, password_hash, last_login_at)
+          VALUES ($1, $2, $3, $4, now())
         `, [userId, name, email, passwordHash]);
       });
     } catch (err) {
@@ -682,25 +622,51 @@ export function registerApiRoutes(app: Express) {
     res.status(201).json(await fetchBootstrap({ id: userId, name, email }));
   }));
 
-  router.post('/auth/login', asyncHandler(async (req, res) => {
+  router.post('/auth/login', loginRateLimit(), asyncHandler(async (req, res) => {
     const email = normalizeEmail(req.body?.email);
     const password = requireText(req.body?.password, 'Senha');
+    if (password.length > 512) throw new HttpError(400, 'Senha muito longa.');
+    const user = await withTransaction(async client => {
+      const result = await client.query<DbUserRow>(
+        'SELECT * FROM users WHERE email = $1 LIMIT 1 FOR UPDATE', [email]);
+      const row = result.rows[0];
+      if (!row || !(await verifyPassword(password, row.password_hash))) {
+        throw new HttpError(401, 'E-mail ou senha inválidos.');
+      }
+      if (!row.is_active) throw new HttpError(403, 'Esta conta está inativa. Entre em contato com o suporte.');
+      if (row.must_change_password && (!row.password_reset_expires_at || row.password_reset_expires_at.getTime() <= Date.now())) {
+        throw new HttpError(401, 'Sua senha temporária expirou. Solicite uma nova ao suporte.');
+      }
+      await client.query('DELETE FROM sessions WHERE user_id = $1 AND expires_at <= now()', [row.id]);
+      await client.query('UPDATE users SET last_login_at = now() WHERE id = $1', [row.id]);
+      await createSession(res, row.id, client);
+      return mapUser(row);
+    });
+    res.json(await fetchBootstrap(user));
+  }));
 
-    const result = await getPool().query<DbUserRow>(`
-      SELECT id, name, email, password_hash
-      FROM users
-      WHERE email = $1
-      LIMIT 1
-    `, [email]);
-
-    const user = result.rows[0];
-    if (!user || !(await verifyPassword(password, user.password_hash))) {
-      throw new HttpError(401, 'E-mail ou senha inválidos.');
-    }
-
-    await getPool().query('DELETE FROM sessions WHERE user_id = $1 AND expires_at <= now()', [user.id]);
-    await createSession(res, user.id);
-    res.json(await fetchBootstrap(mapUser(user)));
+  router.post('/auth/change-password', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req, true);
+    const password = requireText(req.body?.password, 'Nova senha');
+    const confirmation = requireText(req.body?.confirmation, 'Confirmação da senha');
+    if (password.length < 8 || password.length > 128) throw new HttpError(400, 'Use uma senha com 8 a 128 caracteres.');
+    if (password !== confirmation) throw new HttpError(400, 'As senhas não coincidem.');
+    const updatedUser = await withTransaction(async client => {
+      const result = await client.query<DbUserRow>(
+        'SELECT * FROM users WHERE id = $1 FOR UPDATE', [user.id]);
+      const row = result.rows[0];
+      const tokenHash = hashSessionToken(getCookie(req, SESSION_COOKIE));
+      const session = await client.query('SELECT id FROM sessions WHERE user_id = $1 AND token_hash = $2 AND expires_at > now()', [user.id, tokenHash]);
+      if (!row?.is_active || !session.rowCount) throw new HttpError(401, 'Faça login novamente para continuar.');
+      if (!row.must_change_password) throw new HttpError(409, 'Esta conta não possui uma troca de senha pendente.');
+      if (!row.password_reset_expires_at || row.password_reset_expires_at.getTime() <= Date.now()) throw new HttpError(401, 'Sua senha temporária expirou. Solicite uma nova ao suporte.');
+      if (await verifyPassword(password, row.password_hash)) throw new HttpError(400, 'Escolha uma senha diferente da temporária.');
+      await client.query('UPDATE users SET password_hash = $2, must_change_password = false, password_reset_expires_at = NULL, updated_at = now() WHERE id = $1', [user.id, await hashPassword(password)]);
+      await client.query('DELETE FROM sessions WHERE user_id = $1', [user.id]);
+      await createSession(res, user.id, client);
+      return mapUser({ ...row, must_change_password: false });
+    });
+    res.json(await fetchBootstrap(updatedUser));
   }));
 
   router.post('/auth/logout', asyncHandler(async (req, res) => {
