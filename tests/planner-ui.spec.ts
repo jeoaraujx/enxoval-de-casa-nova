@@ -185,28 +185,13 @@ for (const width of [320, 390, 768, 1024, 1440]) {
       .locator(".item-row")
       .filter({ hasText: "=Kit de pratos personalizado" });
     await expect(edited).toContainText("R$ 199,90");
-    await edited
-      .getByRole("button", {
-        name: "Editar =Kit de pratos personalizado",
-        exact: true,
-      })
-      .click();
     await expect(
-      page.getByRole("dialog", { name: "Editar item", exact: true }),
-    ).toBeVisible();
-    const modalCombo = page
-      .getByRole("dialog")
-      .getByRole("combobox", { name: "Ambiente", exact: true });
-    await modalCombo.click();
-    await modalCombo.press("Escape");
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.keyboard.press("Escape");
+      edited.getByRole("button", { name: /^Editar =Kit/ }),
+    ).toHaveCount(0);
     const downloadEvent = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Exportar", exact: true }).click();
     await page
-      .getByRole("button", {
-        name: "Exportar ambiente Cozinha planejada",
-        exact: true,
-      })
+      .getByRole("menuitem", { name: /Baixar Cozinha planejada/ })
       .click();
     const download = await downloadEvent;
     const csv = await fs.readFile((await download.path())!, "utf8");

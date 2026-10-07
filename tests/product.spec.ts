@@ -62,19 +62,21 @@ test("items can be created, edited, bought, exported, persisted and removed", as
     .click();
   await page.getByLabel("Nome do produto").fill("Kit de café de teste");
   await page.getByRole("button", { name: "Adicionar à lista" }).click();
-  await page
-    .getByRole("button", { name: "Editar Kit de café de teste", exact: true })
-    .click();
-  const dialog = page.getByRole("dialog", { name: "Editar item" });
-  await dialog.getByLabel("Preço", { exact: true }).fill("12990");
-  await dialog
-    .getByLabel("Link do produto")
-    .fill("https://example.com/produto");
-  await dialog.getByLabel("Detalhes / Descrição").fill("=Teste de escape CSV");
-  await dialog.getByRole("button", { name: "Salvar detalhes" }).click();
   const row = page
     .locator(".item-row")
     .filter({ hasText: "Kit de café de teste" });
+  await expect(
+    row.getByRole("button", { name: /^Editar Kit de café de teste/ }),
+  ).toHaveCount(0);
+  // Tocar em qualquer ponto da linha (longe do título) abre a edição.
+  await row.scrollIntoViewIfNeeded();
+  const box = (await row.locator(".item-row-inner").boundingBox())!;
+  await page.mouse.click(box.x + box.width * 0.55, box.y + box.height - 4);
+  const form = row.getByRole("form");
+  await form.getByLabel("Preço", { exact: true }).fill("12990");
+  await form.getByLabel("Link do produto").fill("https://example.com/produto");
+  await form.getByLabel("Observações").fill("=Teste de escape CSV");
+  await form.getByRole("button", { name: "Salvar alterações" }).click();
   await expect(row.getByRole("link", { name: "Ver na loja" })).toHaveAttribute(
     "href",
     "https://example.com/produto",
@@ -85,7 +87,10 @@ test("items can be created, edited, bought, exported, persisted and removed", as
   await page.reload();
   await expect(row.getByRole("checkbox")).toBeChecked();
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Exportar lista" }).click();
+  await page.getByRole("button", { name: "Exportar", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: /Baixar todos os ambientes/ })
+    .click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/larume-.+\.csv$/);
   const stream = await download.createReadStream();
@@ -298,26 +303,6 @@ test("login handles API errors and success; registration opens onboarding (mock 
   await expect(page.locator(".workspace-sidebar")).toContainText(
     "Pessoa Teste",
   );
-  await page.goto("/signup");
-  await page.route("**/api/auth/register", (route) =>
-    route.fulfill({
-      json: {
-        ...bootstrap,
-        enxovais: [],
-        activeEnxoval: null,
-        members: [],
-        categories: [],
-        items: [],
-      },
-    }),
-  );
-  await page.getByLabel("Como podemos te chamar?").fill("Pessoa Teste");
-  await page.getByLabel("Seu e-mail").fill("teste@example.com");
-  await page.getByLabel("Sua senha", { exact: true }).fill("senha-de-teste");
-  await page.getByRole("button", { name: "Criar minha conta" }).click();
-  await expect(
-    page.getByRole("dialog", { name: "Novo enxoval" }),
-  ).toBeVisible();
 });
 
 for (const width of [390, 1440]) {

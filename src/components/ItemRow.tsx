@@ -11,7 +11,6 @@ import {
   ExternalLink,
   AlignLeft,
   Trash2,
-  Pencil,
   Clock3,
   ChevronDown,
   LoaderCircle,
@@ -28,7 +27,6 @@ interface ItemRowProps {
   dragHandle?: ReactNode;
   onUpdate: (id: string, updates: Partial<EnxovalItem>) => Promise<void> | void;
   onDelete: (item: EnxovalItem) => void;
-  onEdit: (item: EnxovalItem) => void;
 }
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -54,7 +52,6 @@ export function ItemRow({
   dragHandle,
   onUpdate,
   onDelete,
-  onEdit,
 }: ItemRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [name, setName] = useState(item.name);
@@ -185,16 +182,8 @@ export function ItemRow({
         <div className="item-actions">
           <button
             type="button"
-            onClick={() => onEdit(item)}
-            aria-label={`Editar ${item.name}`}
-            title="Editar no modal"
-            disabled={busy}
-          >
-            <Pencil size={15} />
-          </button>
-          <button
-            type="button"
             onClick={() => onDelete(item)}
+            className="item-delete"
             aria-label={`Remover ${item.name}`}
             title="Remover item"
             disabled={busy}

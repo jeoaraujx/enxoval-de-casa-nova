@@ -10,14 +10,13 @@ import {
   Package,
   Wallet,
   Sparkles,
-  Download,
   Users,
   Plus,
   House,
   Heart,
 } from "lucide-react";
 import type { EnxovalCategory, EnxovalItem } from "../types";
-import { exportItems } from "../utils/export";
+import { ExportMenu } from "./ExportMenu";
 
 export function RoomIcon({ name, size = 18 }: { name: string; size?: number }) {
   const Icon = /cozinha/i.test(name)
@@ -84,12 +83,13 @@ export function WorkspaceOverview({
               : "Organize os desejos, acompanhe as compras e aproveite o caminho."}
           </p>
         </div>
-        <button
-          className="button button-outline export-button"
-          onClick={() => exportItems(items, name)}
-        >
-          <Download size={15} /> Exportar lista
-        </button>
+        {view === "overview" && (
+          <ExportMenu
+            categories={categories}
+            items={items}
+            enxovalName={name}
+          />
+        )}
       </div>
       <div className="workspace-stats">
         <article>

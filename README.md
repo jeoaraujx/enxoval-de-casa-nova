@@ -12,7 +12,8 @@ npm run dev:preview
 Abra **http://localhost:3000**.
 
 - `/`: landing page com recursos, exemplos de planos e perguntas frequentes.
-- `/login` e `/signup`: entrada e cadastro com a nova identidade visual.
+- `/login`: entrada com a nova identidade visual. `/signup` redireciona para `/comecar`.
+- `/comecar`: única porta de cadastro. Faz perguntas curtas, monta o plano de enxoval e cria a conta já com ele. Detalhes em [docs/onboarding-funil.md](docs/onboarding-funil.md).
 - `/demo`: aplicativo interativo com um enxoval de exemplo. Permite criar, editar, concluir e remover itens, criar enxovais e ambientes, reordenar ambientes e itens, registrar descontos e exportar CSV.
 - `/app`: aplicativo conectado à conta.
 

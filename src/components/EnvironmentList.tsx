@@ -1,4 +1,4 @@
-import { Pencil } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import type { EnxovalCategory, EnxovalItem } from "../types";
 import { SortableList } from "./SortableList";
 import { RoomIcon } from "./WorkspaceOverview";
@@ -9,6 +9,7 @@ export function EnvironmentList({
   activeId,
   onSelect,
   onRename,
+  onDelete,
   onReorder,
   disabled = false,
   horizontal = false,
@@ -18,6 +19,7 @@ export function EnvironmentList({
   activeId?: string;
   onSelect: (id: string) => void;
   onRename: (category: EnxovalCategory) => void;
+  onDelete?: (category: EnxovalCategory) => void;
   onReorder: (ids: string[]) => Promise<void>;
   disabled?: boolean;
   horizontal?: boolean;
@@ -60,6 +62,17 @@ export function EnvironmentList({
               disabled={disabled}
             >
               <Pencil size={14} />
+            </button>
+          )}
+          {!horizontal && onDelete && (
+            <button
+              type="button"
+              className="environment-rename environment-delete"
+              aria-label={`Excluir ambiente ${category.name}`}
+              onClick={() => onDelete(category)}
+              disabled={disabled}
+            >
+              <Trash2 size={14} />
             </button>
           )}
         </div>
