@@ -2,6 +2,7 @@
 @import "tailwindcss";
 @import "./product.css";
 @import "./onboarding.css";
+@import "./privacy.css";
 
 @theme {
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;

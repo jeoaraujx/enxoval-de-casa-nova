@@ -4,6 +4,17 @@ import fs from "node:fs/promises";
 
 const widths = [320, 360, 390, 430, 768, 1024, 1280, 1440];
 
+/** "Meu enxoval" abre com todos os itens; as ações de ambiente pedem um ambiente aberto. */
+async function openFirstEnvironment(page: Page, width: number) {
+  const list = page.locator(
+    width >= 1024 ? ".sidebar-rooms" : ".environment-chips",
+  );
+  await list.locator(".environment-select").first().click();
+  await expect(page.locator(".list-section-heading h2")).not.toHaveText(
+    "Meu enxoval",
+  );
+}
+
 async function noHorizontalOverflow(page: Page) {
   expect(
     await page.evaluate(
@@ -82,6 +93,7 @@ for (const width of widths) {
     test("exportação tem um único botão com menu de ambiente ou todos", async ({
       page,
     }) => {
+      await openFirstEnvironment(page, width);
       const triggers = page.getByRole("button", { name: /^Exportar/ });
       await expect(triggers).toHaveCount(1);
       const trigger = triggers.first();
@@ -327,6 +339,7 @@ for (const width of widths) {
     test("excluir ambiente pelo título e pelo menu lateral", async ({
       page,
     }) => {
+      await openFirstEnvironment(page, width);
       await page.screenshot({ path: `tmp/validation/list-${width}.png` });
       const heading = page.locator(".list-section-heading");
       const name = (await heading.locator("h2").textContent())!.trim();
@@ -354,7 +367,8 @@ for (const width of widths) {
       await trash.click();
       await dialog.getByRole("button", { name: "Excluir ambiente" }).click();
       await expect(dialog).toHaveCount(0);
-      await expect(heading.locator("h2")).not.toHaveText(name);
+      // Excluir o ambiente aberto volta para "Meu enxoval" (todos os itens).
+      await expect(heading.locator("h2")).toHaveText("Meu enxoval");
       await expect(
         page.locator(".environment-select").filter({ hasText: name }),
       ).toHaveCount(0);
@@ -366,7 +380,11 @@ for (const width of widths) {
       ).toHaveCount(0);
 
       // Segunda exclusão pelo local de navegação de cada tamanho.
-      const next = (await heading.locator("h2").textContent())!.trim();
+      const next = (await page
+        .locator(width >= 1024 ? ".sidebar-rooms" : ".environment-chips")
+        .locator(".environment-select span")
+        .first()
+        .textContent())!.trim();
       if (width >= 1024) {
         const sidebar = page.locator(".sidebar-rooms");
         const sideTrash = sidebar.getByRole("button", {

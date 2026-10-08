@@ -8,7 +8,7 @@ import type {
   EnxovalWorkspace,
 } from "./types";
 import { demoRequest, isDemoMode } from "./demo";
-import type { PlanPayload } from "./onboarding/types";
+import type { Answers, PlanPayload } from "./onboarding/types";
 
 export class ApiError extends Error {
   status: number;
@@ -65,7 +65,7 @@ export function register(
   name: string,
   email: string,
   password: string,
-  onboarding?: { enxovalName: string; plan: PlanPayload },
+  onboarding?: { enxovalName: string; plan: PlanPayload; profile?: Answers },
 ) {
   return request<BootstrapData>("/api/auth/register", {
     method: "POST",

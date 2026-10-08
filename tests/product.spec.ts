@@ -117,6 +117,10 @@ test("search ignores accents, filters purchases and overview navigates rooms", a
   await page.getByRole("searchbox").fill("ceramica");
   await expect(page.locator(".item-row")).toHaveCount(1);
   await page.getByRole("button", { name: "Limpar busca" }).click();
+  await page
+    .locator(".sidebar-rooms .environment-select")
+    .filter({ hasText: "Cozinha" })
+    .click();
   await page.getByRole("button", { name: "Abrir filtros" }).click();
   await page.getByRole("button", { name: "Checados", exact: true }).click();
   await page.getByRole("button", { name: "Concluir", exact: true }).click();
@@ -163,9 +167,13 @@ test("workspaces and categories can be created and safely removed in demo", asyn
   await page.getByLabel("Nome do produto").fill("Mesa de trabalho");
   await page.getByLabel("Nome do ambiente").fill("Escritório");
   await page.getByRole("button", { name: "Adicionar à lista" }).click();
+  // Em "Meu enxoval" a lista continua com todos os itens, agora com o novo ambiente no card.
   await expect(
-    page.getByRole("heading", { name: "Escritório", exact: true }),
-  ).toBeVisible();
+    page
+      .locator(".item-row")
+      .filter({ hasText: "Mesa de trabalho" })
+      .locator(".item-category-tag"),
+  ).toHaveText("Escritório");
   await page.getByRole("button", { name: "Abrir menu do enxoval" }).click();
   await page
     .getByRole("button", { name: "Excluir enxoval", exact: true })
@@ -216,11 +224,22 @@ test("mobile menu, swipe, refresh and bottom navigation remain usable", async ({
     page.getByRole("button", { name: "Abrir menu" }),
   ).toHaveAttribute("aria-expanded", "false");
   await page.goto("/demo");
-  const box = await page.locator(".item-name").first().boundingBox();
-  await page.mouse.move(box!.x + box!.width - 5, box!.y + 5);
-  await page.mouse.down();
-  await page.mouse.move(Math.max(10, box!.x - 80), box!.y + 5, { steps: 8 });
-  await page.mouse.up();
+  const swipeLeft = async () => {
+    const box = await page.locator(".item-name").first().boundingBox();
+    await page.mouse.move(box!.x + box!.width - 5, box!.y + 5);
+    await page.mouse.down();
+    await page.mouse.move(Math.max(10, box!.x - 80), box!.y + 5, { steps: 8 });
+    await page.mouse.up();
+  };
+  // Começa em "Meu enxoval" (todos os itens): o primeiro gesto abre o primeiro ambiente.
+  await expect(
+    page.getByRole("heading", { name: "Meu enxoval", exact: true }),
+  ).toBeVisible();
+  await swipeLeft();
+  await expect(
+    page.getByRole("heading", { name: "Cozinha", exact: true }),
+  ).toBeVisible();
+  await swipeLeft();
   await expect(
     page.getByRole("heading", { name: "Quarto", exact: true }),
   ).toBeVisible();
@@ -261,7 +280,7 @@ test("mobile menu, swipe, refresh and bottom navigation remain usable", async ({
   await page.getByRole("button", { name: "Meu enxoval", exact: true }).click();
   await expect(header).toContainText("Quarto");
   await expect(
-    page.getByRole("heading", { name: "Quarto", exact: true }),
+    page.getByRole("heading", { name: "Meu enxoval", exact: true }),
   ).toBeVisible();
 });
 

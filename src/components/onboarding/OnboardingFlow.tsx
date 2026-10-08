@@ -20,6 +20,7 @@ import {
   Bath,
   BedDouble,
   Building2,
+  CalendarClock,
   CalendarDays,
   Check,
   ClipboardCheck,
@@ -35,12 +36,15 @@ import {
   House,
   Laptop,
   Leaf,
+  Moon,
   Link2,
   ListChecks,
   ListOrdered,
   LoaderCircle,
   MapPin,
+  PackageCheck,
   PiggyBank,
+  Receipt,
   Refrigerator,
   ShieldCheck,
   Share2,
@@ -49,6 +53,7 @@ import {
   Sofa,
   Sparkles,
   Sun,
+  TrendingDown,
   Trees,
   Truck,
   User,
@@ -67,9 +72,14 @@ import {
   defaultRooms,
   emptyAnswers,
   firstName,
+  firstNightItems,
   formatEstimate,
   generatePlan,
+  parseLocalDate,
   phaseOf,
+  roomItemCounts,
+  savingsFor,
+  scheduleFor,
   SEASONS,
   STATES,
   stateInfo,
@@ -87,8 +97,10 @@ import {
 import type {
   Answers,
   Budget,
+  ExcludeReason,
   GeneratedPlan,
   Housing,
+  Milestone,
   Moment,
   OptionalRoom,
   Owned,
@@ -135,6 +147,9 @@ const ALL_STEPS = [
   "thanks",
   "building",
   "ready",
+  "savings",
+  "firstnight",
+  "schedule",
   "compare",
   "save",
 ] as const;
@@ -143,8 +158,13 @@ type StepId = (typeof ALL_STEPS)[number];
 const isStepId = (value: string): value is StepId =>
   (ALL_STEPS as readonly string[]).includes(value);
 
-function visibleSteps(answers: Answers): StepId[] {
-  return ALL_STEPS.filter((s) => s !== "timeline" || answers.moveDate !== null);
+function visibleSteps(answers: Answers, plan: GeneratedPlan): StepId[] {
+  const hasKit = firstNightItems(plan).length > 0;
+  return ALL_STEPS.filter((step) => {
+    if (step === "timeline" || step === "schedule") return answers.moveDate !== null;
+    if (step === "firstnight") return hasKit;
+    return true;
+  });
 }
 
 const TIMEZONE_STATES: Record<string, string> = {
@@ -310,9 +330,9 @@ export default function OnboardingFlow() {
     };
   }, []);
 
-  const steps = visibleSteps(answers);
-  const index = Math.max(steps.indexOf(step), 0);
   const plan = useMemo(() => generatePlan(answers), [answers]);
+  const steps = visibleSteps(answers, plan);
+  const index = Math.max(steps.indexOf(step), 0);
   const first = firstName(answers.name);
 
   const set = useCallback(
@@ -356,7 +376,7 @@ export default function OnboardingFlow() {
   useEffect(() => {
     if (step === "welcome" && !hasProgress && !answers.name) return;
     saveOnboarding({
-      v: 1,
+      v: 2,
       answers,
       step: step === "building" ? "thanks" : step,
       completed,
@@ -431,6 +451,8 @@ export default function OnboardingFlow() {
         return answers.moveDateAnswered;
       case "housing":
         return answers.housing !== null;
+      case "rooms":
+        return (answers.rooms ?? defaultRooms(answers.housing, answers.people)).length > 0;
       case "owned":
         return answers.owned !== null;
       case "style":
@@ -444,7 +466,7 @@ export default function OnboardingFlow() {
 
   const resume = () => {
     const target = saved && isStepId(saved.step) ? saved.step : "name";
-    const list = visibleSteps(answers);
+    const list = visibleSteps(answers, plan);
     goTo(
       completed ? "ready" : list.includes(target) ? target : "name",
       1,
@@ -631,7 +653,7 @@ export default function OnboardingFlow() {
       case "rooms":
         return (
           <RoomsStep
-            housing={answers.housing}
+            answers={answers}
             rooms={rooms}
             onToggle={(room) => set({ rooms: toggle(rooms, room) })}
             reduced={reduced}
@@ -671,7 +693,7 @@ export default function OnboardingFlow() {
               Quanto você pretende investir?
             </h1>
             <p className="ob-sub">
-              Uma ideia basta, você ajusta depois. Só você vê isso.
+              Uma ideia basta, você ajusta depois. Fica neste aparelho até você criar a conta; depois, guardamos na sua conta para dimensionar o plano.
             </p>
             <RadioOptions
               legend="Orçamento"
@@ -765,6 +787,17 @@ export default function OnboardingFlow() {
             first={first}
             reduced={reduced}
           />
+        );
+
+      case "savings":
+        return <SavingsStep answers={answers} loc={info.loc} reduced={reduced} />;
+
+      case "firstnight":
+        return <FirstNightStep plan={plan} first={first} reduced={reduced} />;
+
+      case "schedule":
+        return (
+          <ScheduleStep plan={plan} moveDate={answers.moveDate} reduced={reduced} />
         );
 
       case "compare":
@@ -1175,7 +1208,7 @@ function StateStep({
           ? "Sem acesso à localização. Tudo bem: escolha o estado na lista."
           : status === "unavailable"
             ? "Não deu para descobrir a localização agora. Escolha na lista."
-            : "Usamos só para escolher o estado. Não guardamos a sua posição.";
+            : "Usamos só para escolher o estado. Não guardamos a sua posição, só o estado.";
 
   return (
     <>
@@ -1333,20 +1366,30 @@ function PeopleStep({
 /* ------------------------------------------------------------ ambientes */
 
 function RoomsStep({
-  housing,
+  answers,
   rooms,
   onToggle,
   reduced,
 }: {
-  housing: Housing | null;
+  answers: Answers;
   rooms: OptionalRoom[];
   onToggle: (room: OptionalRoom) => void;
   reduced: boolean;
 }) {
+  const housing = answers.housing;
   const studio = housing === "studio";
-  const options: Option<OptionalRoom>[] = [
+  const counts = useMemo(() => roomItemCounts(answers), [answers]);
+  const total = useMemo(
+    () => generatePlan({ ...answers, rooms }).stats.total,
+    [answers, rooms],
+  );
+  const base: Option<OptionalRoom>[] = [
+    { value: "cozinha", label: "Cozinha", hint: "Com os eletrodomésticos", icon: <CookingPot size={20} /> },
+    { value: "banheiro", label: "Banheiro", icon: <Bath size={20} /> },
     ...(studio
-      ? []
+      ? ([
+          { value: "sala", label: "Sala e quarto", hint: "Integrados, como no studio", icon: <Sofa size={20} /> },
+        ] as Option<OptionalRoom>[])
       : ([
           { value: "sala", label: "Sala de estar", icon: <Sofa size={20} /> },
           { value: "quarto", label: "Quarto principal", icon: <BedDouble size={20} /> },
@@ -1360,20 +1403,18 @@ function RoomsStep({
     },
     { value: "escritorio", label: "Home office", icon: <Laptop size={20} /> },
   ];
-  const included = ["Cozinha", "Banheiro", ...(studio ? ["Sala e quarto"] : [])];
+  const options = base.map((option) => ({
+    ...option,
+    meta: counts[option.value] ? plural(counts[option.value]!, "item", "itens") : undefined,
+  }));
   return (
     <>
       <h1 className="ob-title" tabIndex={-1}>
         Quais espaços você quer equipar?
       </h1>
-      <p className="ob-sub">Já incluí o que toda casa precisa.</p>
-      <ul className="ob-included" aria-label="Já incluídos">
-        {included.map((name) => (
-          <li key={name}>
-            <Check size={14} strokeWidth={3} /> {name}
-          </li>
-        ))}
-      </ul>
+      <p className="ob-sub">
+        Marque o que entra no plano. O número mostra quantos itens cada espaço tem.
+      </p>
       <CheckOptions
         legend="Espaços da casa"
         name="rooms"
@@ -1382,6 +1423,16 @@ function RoomsStep({
         onToggle={onToggle}
         reduced={reduced}
       />
+      <p className="ob-live" aria-live="polite">
+        {rooms.length === 0 ? (
+          "Marque pelo menos um espaço para continuar."
+        ) : (
+          <>
+            Com essas escolhas, seu plano tem{" "}
+            <strong>{plural(total, "item", "itens")}</strong>.
+          </>
+        )}
+      </p>
     </>
   );
 }
@@ -1637,6 +1688,280 @@ function ReadyStep({
   );
 }
 
+/* -------------------------------------------------------- valor: economia */
+
+const REASON_LABEL: Record<
+  ExcludeReason,
+  (context: { loc: string; housing: Housing | null }) => string
+> = {
+  rooms: () => "Espaços que você não vai equipar",
+  housing: ({ housing }) =>
+    `Não servem para ${housing === "casa" ? "uma casa" : housing === "studio" ? "um studio" : "um apartamento"}`,
+  climate: ({ loc }) => `Peças de frio que o clima ${loc} dispensa`,
+  region: () => "Itens típicos de outra região",
+  moment: () => "Itens de outro momento de vida",
+  style: () => "Opcionais que o estilo minimalista dispensa",
+};
+
+function SavingsStep({
+  answers,
+  loc,
+  reduced,
+}: {
+  answers: Answers;
+  loc: string;
+  reduced: boolean;
+}) {
+  const sv = useMemo(() => savingsFor(answers), [answers]);
+  const ratio = sv.genericTotal ? sv.planTotal / sv.genericTotal : 1;
+  const savedMin = Math.max(sv.genericMinCents - sv.planMinCents, 0);
+  const savedMax = Math.max(sv.genericMaxCents - sv.planMaxCents, 0);
+  const none = sv.removedCount === 0;
+  const title = none
+    ? "Sua lista já está no tamanho certo"
+    : `${plural(sv.removedCount, "item", "itens")} que você não precisa comprar`;
+  return (
+    <>
+      <span className="ob-eyebrow ob-eyebrow-left">COMPARADO A UMA LISTA GENÉRICA</span>
+      <h1 className="ob-title" tabIndex={-1} aria-label={title}>
+        {none ? (
+          title
+        ) : (
+          <span aria-hidden="true">
+            <CountUp to={sv.removedCount} reduced={reduced} />{" "}
+            {sv.removedCount === 1 ? "item" : "itens"} que você não precisa comprar
+          </span>
+        )}
+      </h1>
+      <p className="ob-sub">
+        Uma lista genérica manda comprar tudo, para qualquer casa. A sua foi
+        ajustada às suas respostas.
+      </p>
+
+      <div className="ob-bars">
+        <div className="ob-bar-row">
+          <div className="ob-bar-label">
+            <span>Lista genérica</span>
+            <strong>{plural(sv.genericTotal, "item", "itens")}</strong>
+          </div>
+          <div className="ob-bar-track">
+            <motion.span
+              className="ob-bar-fill ob-bar-generic"
+              initial={reduced ? false : { width: 0 }}
+              animate={{ width: "100%" }}
+              transition={{ duration: 0.8, ease: EASE, delay: 0.15 }}
+            />
+          </div>
+          <small>≈ {formatEstimate(sv.genericMinCents, sv.genericMaxCents)}</small>
+        </div>
+        <div className="ob-bar-row">
+          <div className="ob-bar-label">
+            <span>O plano de {firstName(answers.name)}</span>
+            <strong>{plural(sv.planTotal, "item", "itens")}</strong>
+          </div>
+          <div className="ob-bar-track">
+            <motion.span
+              className="ob-bar-fill ob-bar-plan"
+              initial={reduced ? false : { width: 0 }}
+              animate={{ width: `${Math.max(ratio * 100, 4)}%` }}
+              transition={{ duration: 0.9, ease: EASE, delay: 0.45 }}
+            />
+          </div>
+          <small>≈ {formatEstimate(sv.planMinCents, sv.planMaxCents)}</small>
+        </div>
+      </div>
+
+      {savedMax > 0 && (
+        <div className="ob-callout">
+          <TrendingDown size={20} />
+          <span>
+            Cerca de <strong>{formatEstimate(savedMin, savedMax)}</strong> de
+            referência que você não gasta com itens que não servem para a sua casa.
+          </span>
+        </div>
+      )}
+
+      {sv.reasons.length > 0 && (
+        <>
+          <h2 className="ob-label">O que ficou de fora e por quê</h2>
+          <Stagger className="ob-reasons" reduced={reduced}>
+            {sv.reasons.slice(0, 4).map((reason) => (
+              <motion.div
+                key={reason.reason}
+                className="ob-reason"
+                variants={reduced ? undefined : itemVariants}
+              >
+                <div>
+                  <strong>
+                    {REASON_LABEL[reason.reason]({ loc, housing: answers.housing })}
+                  </strong>
+                  <span>{plural(reason.count, "item", "itens")}</span>
+                </div>
+                <p>{reason.examples.join(", ")}</p>
+              </motion.div>
+            ))}
+          </Stagger>
+        </>
+      )}
+      <p className="ob-fine">
+        Valores de referência. Os preços reais são os que você anotar.
+      </p>
+    </>
+  );
+}
+
+/* ------------------------------------------------ valor: primeira noite */
+
+function FirstNightStep({
+  plan,
+  first,
+  reduced,
+}: {
+  plan: GeneratedPlan;
+  first: string;
+  reduced: boolean;
+}) {
+  const items = firstNightItems(plan);
+  const groups = [...new Set(items.map((item) => item.category))].map((category) => ({
+    category,
+    items: items.filter((item) => item.category === category),
+  }));
+  return (
+    <>
+      <div className="ob-ready-head">
+        <Ring reduced={reduced} size="md">
+          <Moon size={34} strokeWidth={1.4} />
+        </Ring>
+        <h1 className="ob-title ob-title-center" tabIndex={-1}>
+          A primeira noite de {first}, resolvida
+        </h1>
+        <p className="ob-sub ob-sub-center">
+          Estes {plural(items.length, "item", "itens")} deixam a casa pronta para
+          dormir, tomar banho e comer no dia da mudança. Compre estes primeiro; o
+          resto pode esperar.
+        </p>
+      </div>
+      <Stagger className="ob-night" reduced={reduced}>
+        {groups.map((group) => (
+          <motion.section
+            key={group.category}
+            className="ob-night-group"
+            variants={reduced ? undefined : itemVariants}
+          >
+            <h2>{group.category}</h2>
+            <ul>
+              {group.items.map((item) => {
+                const quantity = item.description.match(/(\d+) un\./)?.[0];
+                return (
+                  <li key={item.name}>
+                    <span className="ob-night-check">
+                      <Check size={13} strokeWidth={3} />
+                    </span>
+                    <span>
+                      {item.name}
+                      {quantity && <small> · {quantity}</small>}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </motion.section>
+        ))}
+      </Stagger>
+    </>
+  );
+}
+
+/* ----------------------------------------------- valor: cronograma */
+
+const MILESTONE_COPY: Record<Milestone["id"], { title: string; tip: string }> = {
+  big: {
+    title: "Móveis e eletros grandes",
+    tip: "Pesquise preço e prazo de entrega: são os que mais pesam no bolso e demoram a chegar.",
+  },
+  mid: {
+    title: "Itens de valor médio",
+    tip: "Dá para comparar preços com calma e aproveitar promoções.",
+  },
+  small: {
+    title: "O restante do essencial",
+    tip: "Itens baratos do dia a dia. Dá para resolver em uma ida só.",
+  },
+  night: {
+    title: "Kit da primeira noite",
+    tip: "Deixe separado e à mão: será a primeira coisa que você vai usar.",
+  },
+  after: {
+    title: "Depois de morar",
+    tip: "Opcionais e detalhes. Morando lá, você descobre o que realmente falta.",
+  },
+};
+
+const shortDate = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short" });
+
+function ScheduleStep({
+  plan,
+  moveDate,
+  reduced,
+}: {
+  plan: GeneratedPlan;
+  moveDate: string | null;
+  reduced: boolean;
+}) {
+  const milestones = useMemo(() => scheduleFor(plan, moveDate), [plan, moveDate]);
+  const label = (milestone: Milestone) =>
+    milestone.id === "after"
+      ? "Depois da mudança"
+      : milestone.now || !milestone.date
+        ? "Agora"
+        : `Até ${shortDate.format(parseLocalDate(milestone.date))}`;
+  return (
+    <>
+      <div className="ob-ready-head">
+        <Ring reduced={reduced} size="md">
+          <CalendarClock size={34} strokeWidth={1.4} />
+        </Ring>
+        <h1 className="ob-title ob-title-center" tabIndex={-1}>
+          Seu cronograma de compras
+        </h1>
+        {moveDate && (
+          <p className="ob-sub ob-sub-center">
+            Montado com a data da sua mudança, {formatLongDate(moveDate)}.
+          </p>
+        )}
+      </div>
+      <motion.ol
+        className="ob-schedule"
+        initial={reduced ? false : "hidden"}
+        animate="show"
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.09, delayChildren: 0.1 } } }}
+      >
+        {milestones.map((milestone) => (
+          <motion.li
+            key={milestone.id}
+            variants={reduced ? undefined : itemVariants}
+            data-now={milestone.now}
+          >
+            <span className="ob-schedule-dot" aria-hidden="true" />
+            <div className="ob-schedule-card">
+              <span className="ob-schedule-date">{label(milestone)}</span>
+              <div className="ob-schedule-title">
+                <strong>{MILESTONE_COPY[milestone.id].title}</strong>
+                <span>{plural(milestone.count, "item", "itens")}</span>
+              </div>
+              <p>{MILESTONE_COPY[milestone.id].tip}</p>
+              <small>Ex.: {milestone.examples.join(", ")}</small>
+            </div>
+          </motion.li>
+        ))}
+      </motion.ol>
+      <p className="ob-fine">
+        <PackageCheck size={14} /> Cada compra vira um item que você marca na lista.
+      </p>
+    </>
+  );
+}
+
 /* ------------------------------------------------------------ comparação */
 
 function CompareStep({
@@ -1710,6 +2035,13 @@ function CompareStep({
 
 /* ---------------------------------------------------------------- salvar */
 
+const BENEFITS: { Icon: LucideIcon; text: string }[] = [
+  { Icon: ListChecks, text: "Marque o que já comprou e acompanhe o progresso de cada ambiente" },
+  { Icon: Wallet, text: "Anote preço e link de cada item e veja quanto já gastou" },
+  { Icon: Receipt, text: "Registre descontos e cashback e veja o gasto líquido" },
+  { Icon: Share2, text: "Compartilhe a lista com quem mora com você" },
+];
+
 function SaveStep({
   answers,
   plan,
@@ -1727,6 +2059,13 @@ function SaveStep({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const payload = useMemo(() => toPayload(plan), [plan]);
+  // Os mesmos valores que geraram o plano: o servidor exige todas as respostas obrigatórias.
+  const profile = {
+    ...answers,
+    state: answers.state ?? guessState(),
+    people: answers.people ?? defaultPeople(answers.moment),
+    rooms: answers.rooms ?? defaultRooms(answers.housing, answers.people),
+  };
 
   // Um único pedido cria a conta e o primeiro enxoval, já com o plano. Se falhar,
   // nada é criado pela metade e as respostas continuam guardadas.
@@ -1739,6 +2078,7 @@ function SaveStep({
       await register(answers.name.trim(), email.trim(), password, {
         enxovalName: plan.enxovalName,
         plan: payload,
+        profile,
       });
       clearOnboarding();
       track("signup_success");
@@ -1777,6 +2117,17 @@ function SaveStep({
           {plural(plan.stats.rooms, "ambiente", "ambientes")}
         </p>
       </div>
+
+      <ul className="ob-benefits" aria-label="O que você ganha ao criar a conta">
+        {BENEFITS.map(({ Icon, text }) => (
+          <li key={text}>
+            <span>
+              <Icon size={16} />
+            </span>
+            {text}
+          </li>
+        ))}
+      </ul>
 
       <form className="ob-form" onSubmit={submit}>
         <label>
@@ -1827,6 +2178,15 @@ function SaveStep({
           {!submitting && <ArrowRight size={18} />}
         </button>
       </form>
+      <p className="ob-privacy">
+        Ao criar a conta, guardamos as suas respostas (como estado, data da
+        mudança e faixa de orçamento) para montar e ajustar o seu plano. Veja como
+        tratamos os seus dados na{" "}
+        <a href="/privacidade" target="_blank" rel="noopener">
+          política de privacidade
+        </a>
+        .
+      </p>
 
       <div className="ob-divider">
         <span>ou</span>

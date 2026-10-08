@@ -233,6 +233,7 @@ export function CheckOptions<T extends string>({
                 <strong>{option.label}</strong>
                 {option.hint && <small>{option.hint}</small>}
               </span>
+              {option.meta && <span className="ob-option-meta">{option.meta}</span>}
               <Tick selected={selected} reduced={reduced} shape="square" />
             </motion.label>
           );

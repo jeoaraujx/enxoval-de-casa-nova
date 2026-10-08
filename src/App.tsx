@@ -226,7 +226,7 @@ export default function App() {
     setMembers(workspace.members);
     setCategories(workspace.categories);
     setItems(workspace.items);
-    setActiveCategoryId(workspace.categories[0]?.id || "");
+    setActiveCategoryId("");
   };
 
   const applyBootstrap = (
@@ -239,7 +239,7 @@ export default function App() {
     setMembers(data.members);
     setCategories(data.categories);
     setItems(data.items);
-    setActiveCategoryId(data.categories[0]?.id || "");
+    setActiveCategoryId("");
 
     if (options?.promptCreateEnxoval) {
       setDialogError("");
@@ -514,9 +514,11 @@ export default function App() {
     };
   }, [handleRefresh, isWorkspaceMenuOpen, isHeaderMobile, isRefreshing, user]);
 
-  const activeCategory =
-    categories.find((category) => category.id === activeCategoryId) ??
-    categories[0];
+  // Sem ambiente selecionado (activeCategoryId vazio) a lista mostra todos os itens.
+  const activeCategory = categories.find(
+    (category) => category.id === activeCategoryId,
+  );
+  const isAllEnvironments = !activeCategory;
   const normalizedSearchQuery = normalizeSearchText(searchQuery);
   const isSearching = normalizedSearchQuery.length > 0;
   const isShowingLatestChanges = itemSortMode === "updated";
@@ -531,7 +533,7 @@ export default function App() {
   );
   const filteredItems = useMemo(() => {
     const baseItems =
-      isSearching || isShowingLatestChanges
+      isShowingLatestChanges || isAllEnvironments
         ? items
         : activeCategory
           ? items.filter((item) => item.categoryId === activeCategory.id)
@@ -565,9 +567,16 @@ export default function App() {
       return true;
     });
 
+    const categoryPosition = new Map(
+      categories.map((category, index) => [category.id, index]),
+    );
     return [...narrowedItems].sort((firstItem, secondItem) => {
       if (itemSortMode === "manual")
         return (
+          (isAllEnvironments
+            ? (categoryPosition.get(firstItem.categoryId) ?? 0) -
+              (categoryPosition.get(secondItem.categoryId) ?? 0)
+            : 0) ||
           firstItem.sortOrder - secondItem.sortOrder ||
           firstItem.name.localeCompare(secondItem.name, "pt-BR")
         );
@@ -588,7 +597,9 @@ export default function App() {
     });
   }, [
     activeCategory,
+    categories,
     categoryById,
+    isAllEnvironments,
     isSearching,
     isShowingLatestChanges,
     itemSortMode,
@@ -606,15 +617,22 @@ export default function App() {
     : isShowingLatestChanges
       ? "Últimas alterações"
       : hasItemFilters
-        ? `Itens filtrados em ${activeCategory?.name ?? "ambiente"}`
-        : `Progresso de ${activeCategory?.name ?? "ambiente"}`;
+        ? activeCategory
+          ? `Itens filtrados em ${activeCategory.name}`
+          : "Itens filtrados"
+        : activeCategory
+          ? `Progresso de ${activeCategory.name}`
+          : "Progresso do enxoval";
   const listCounterText =
     !isSearching && !isShowingLatestChanges && !hasItemFilters
       ? `${filteredCheckedCount} de ${filteredItems.length} itens`
       : itemCountText;
-  const showItemCategory = isSearching || isShowingLatestChanges;
+  const showItemCategory = isAllEnvironments || isShowingLatestChanges;
+  const searchScopeLabel = activeCategory
+    ? `Buscar em ${activeCategory.name}`
+    : "Buscar em todos os ambientes";
   const canSwipeCategories =
-    categories.length > 1 && !isSearching && !isShowingLatestChanges;
+    categories.length > 0 && !isSearching && !isShowingLatestChanges;
   const categorySwipeAnimationClass =
     categorySwipeDirection === "next"
       ? "category-list-enter-next"
@@ -630,12 +648,21 @@ export default function App() {
         }
       : undefined;
 
+  // Na lista de um ambiente, os totais (progresso e gastos) são só daquele ambiente.
+  const scopeItems = useMemo(
+    () =>
+      workspaceView === "list" && activeCategory
+        ? items.filter((item) => item.categoryId === activeCategory.id)
+        : null,
+    [activeCategory, items, workspaceView],
+  );
   const progressStats = useMemo(() => {
-    const total = items.length;
-    const completed = items.filter((i) => i.checked).length;
+    const scoped = scopeItems ?? items;
+    const total = scoped.length;
+    const completed = scoped.filter((i) => i.checked).length;
     const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
     return { total, completed, percentage };
-  }, [items]);
+  }, [items, scopeItems]);
   const checkedSubtotalSpentCents = useMemo(
     () =>
       items.reduce((total, item) => {
@@ -665,7 +692,16 @@ export default function App() {
       : "Descontos e cashback";
   const discountAdjustmentPreviewText = formatCurrency(discountAdjustmentCents);
   const workingDiscountText = formatCurrency(discountWorkingCents);
-  const checkedTotalSpentText = formatCurrency(checkedTotalSpentCents);
+  const checkedTotalSpentText = formatCurrency(
+    scopeItems
+      ? scopeItems.reduce((total, item) => {
+          const priceCents = normalizePriceCents(item.priceCents);
+          return item.checked && priceCents && priceCents > 0
+            ? total + priceCents
+            : total;
+        }, 0)
+      : checkedTotalSpentCents,
+  );
   const discountPreviewTotalText = formatCurrency(discountPreviewTotalCents);
   const hasEnxoval = enxovais.length > 0 && Boolean(activeEnxoval);
   const isOwner = activeEnxoval?.role === "owner";
@@ -728,22 +764,23 @@ export default function App() {
 
   const changeCategoryBySwipe = useCallback(
     (direction: CategorySwipeDirection) => {
-      if (!canSwipeCategories || !activeCategory) return false;
+      if (!canSwipeCategories) return false;
 
-      const currentCategoryIndex = categories.findIndex(
-        (category) => category.id === activeCategory.id,
-      );
-      if (currentCategoryIndex < 0) return false;
-
+      // -1 representa "todos os ambientes", antes do primeiro ambiente.
+      const currentCategoryIndex = activeCategory
+        ? categories.findIndex((category) => category.id === activeCategory.id)
+        : -1;
       const nextCategoryIndex =
         direction === "next"
           ? currentCategoryIndex + 1
           : currentCategoryIndex - 1;
-      const nextCategory = categories[nextCategoryIndex];
-      if (!nextCategory) return false;
+      if (nextCategoryIndex < -1 || nextCategoryIndex >= categories.length)
+        return false;
 
       startCategorySwipeAnimation(direction);
-      setActiveCategoryId(nextCategory.id);
+      setActiveCategoryId(
+        nextCategoryIndex === -1 ? "" : categories[nextCategoryIndex].id,
+      );
       return true;
     },
     [
@@ -955,7 +992,8 @@ export default function App() {
     });
 
     setItems((current) => [...current, result.item]);
-    setActiveCategoryId(result.category.id);
+    // Na lista de todos os ambientes continua nela; a categoria só muda quando já havia uma ativa.
+    setActiveCategoryId((current) => (current ? result.category.id : ""));
   };
 
   const openDeleteItem = (item: EnxovalItem) => {
@@ -1242,6 +1280,12 @@ export default function App() {
     setIsInviteOpen(true);
   };
 
+  const showAllItems = () => {
+    setActiveCategoryId("");
+    setWorkspaceView("list");
+    setSearchQuery("");
+    setItemSortMode("manual");
+  };
   const selectEnvironment = (id: string) => {
     setActiveCategoryId(id);
     setWorkspaceView("list");
@@ -1353,11 +1397,7 @@ export default function App() {
       setItems((current) =>
         current.filter((item) => item.categoryId !== deletedId),
       );
-      if (activeCategory?.id === deletedId) {
-        setActiveCategoryId(
-          remaining[Math.min(index, remaining.length - 1)]?.id ?? "",
-        );
-      }
+      if (activeCategory?.id === deletedId) setActiveCategoryId("");
       setCategoryToDelete(null);
     } catch (err) {
       setDialogError(
@@ -1435,9 +1475,7 @@ export default function App() {
   }
 
   if (!user) {
-    return (
-      <AuthPage onAuthenticated={applyBootstrap} />
-    );
+    return <AuthPage onAuthenticated={applyBootstrap} />;
   }
 
   return (
@@ -1480,8 +1518,15 @@ export default function App() {
               <LayoutDashboard size={18} /> Visão geral
             </button>
             <button
-              className={workspaceView === "list" ? "active" : ""}
-              onClick={() => setWorkspaceView("list")}
+              className={
+                workspaceView === "list" && isAllEnvironments ? "active" : ""
+              }
+              aria-current={
+                workspaceView === "list" && isAllEnvironments
+                  ? "page"
+                  : undefined
+              }
+              onClick={showAllItems}
             >
               <ListChecks size={18} /> Meu enxoval <span>{items.length}</span>
             </button>
@@ -1693,6 +1738,12 @@ export default function App() {
                   onRename={openRenameCategory}
                   onReorder={commitEnvironmentOrder}
                   disabled={isWorkspaceLoading || isOrdering}
+                  allOption={{
+                    active: isAllEnvironments,
+                    onSelect: showAllItems,
+                    done: items.filter((item) => item.checked).length,
+                    total: items.length,
+                  }}
                   horizontal
                 />
               </motion.div>
@@ -1720,6 +1771,11 @@ export default function App() {
               name={activeEnxoval!.name}
               discountCents={enxovalDiscountCents}
               view={workspaceView}
+              scope={
+                scopeItems && activeCategory
+                  ? { name: activeCategory.name, items: scopeItems }
+                  : undefined
+              }
               onCategory={(id) => {
                 setActiveCategoryId(id);
                 setWorkspaceView("list");
@@ -1733,7 +1789,11 @@ export default function App() {
             <>
               <div className="list-section-heading">
                 <div>
-                  <RoomIcon name={activeCategory?.name ?? ""} size={24} />
+                  {activeCategory ? (
+                    <RoomIcon name={activeCategory.name} size={24} />
+                  ) : (
+                    <ListChecks size={24} strokeWidth={1.6} />
+                  )}
                   <h2>
                     {isSearching
                       ? "Sua busca"
@@ -1741,7 +1801,10 @@ export default function App() {
                         ? "Últimas alterações"
                         : (activeCategory?.name ?? "Meu enxoval")}
                   </h2>
-                  <span>{filteredItems.length} itens</span>
+                  <span>
+                    {filteredItems.length}{" "}
+                    {filteredItems.length === 1 ? "item" : "itens"}
+                  </span>
                   {!isSearching &&
                     !isShowingLatestChanges &&
                     activeCategory && (
@@ -1788,10 +1851,10 @@ export default function App() {
                   />
                   <input
                     type="search"
-                    aria-label="Buscar em todos os ambientes"
+                    aria-label={searchScopeLabel}
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Buscar em todos os ambientes"
+                    placeholder={searchScopeLabel}
                     className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-10 pr-11 text-base text-stone-800 shadow-sm outline-none transition focus:border-brand-wood focus:ring-2 focus:ring-brand-wood/30"
                   />
                   {searchQuery && (
@@ -1815,7 +1878,7 @@ export default function App() {
                 >
                   <SlidersHorizontal size={18} />
                   {activeFilterCount > 0 && (
-                    <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-wood px-1 text-[11px] font-bold leading-none text-white">
+                    <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-wood px-1 text-xs font-bold leading-none text-white">
                       {activeFilterCount}
                     </span>
                   )}
@@ -1874,7 +1937,9 @@ export default function App() {
                             ? "Tente buscar por outro nome, detalhe ou ambiente."
                             : activeFilterCount > 0
                               ? "Ajuste os filtros para ver mais itens."
-                              : `Toque no botão abaixo para adicionar itens ao ambiente ${activeCategory?.name ?? "selecionado"}.`}
+                              : activeCategory
+                                ? `Toque no botão abaixo para adicionar itens ao ambiente ${activeCategory.name}.`
+                                : "Toque no botão abaixo para adicionar o primeiro item ao seu enxoval."}
                         </p>
                       </div>
                     )}
@@ -1942,7 +2007,7 @@ export default function App() {
             aria-current={
               !isInviteOpen && workspaceView === "list" ? "page" : undefined
             }
-            onClick={() => setWorkspaceView("list")}
+            onClick={showAllItems}
           >
             <ListChecks size={19} />
             Meu enxoval

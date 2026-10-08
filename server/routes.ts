@@ -6,6 +6,7 @@ import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMemb
 import { getPool, withTransaction, Queryable } from './database.ts';
 import { asyncHandler, cookieOptions, getCookie, hashPassword, hashSessionToken, HttpError, loginRateLimit, protectMutationOrigin, verifyPassword } from './security.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { parseOnboardingProfile, type OnboardingProfile } from './onboarding-profile.ts';
 
 const SESSION_COOKIE = 'enxoval_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
@@ -380,6 +381,7 @@ function parsePlan(value: unknown): EnxovalPlan | null {
   if (new Set(parsed.map(category => category.name)).size !== parsed.length) {
     throw new HttpError(400, 'Plano com ambientes repetidos.');
   }
+  if (totalItems === 0) throw new HttpError(400, 'Plano sem itens.');
 
   return { categories: parsed };
 }
@@ -409,14 +411,14 @@ async function insertEnxoval(
   client: PoolClient,
   userId: string,
   name: string,
-  options: { useDefaultTemplate?: boolean; plan?: EnxovalPlan | null } = {}
+  options: { useDefaultTemplate?: boolean; plan?: EnxovalPlan | null; profile?: OnboardingProfile | null } = {}
 ) {
   const enxovalId = randomUUID();
 
   await client.query(`
-    INSERT INTO enxovais (id, name, owner_id)
-    VALUES ($1, $2, $3)
-  `, [enxovalId, name, userId]);
+    INSERT INTO enxovais (id, name, owner_id, onboarding_profile)
+    VALUES ($1, $2, $3, $4::jsonb)
+  `, [enxovalId, name, userId, options.profile ? JSON.stringify(options.profile) : null]);
 
   await client.query(`
     INSERT INTO enxoval_members (enxoval_id, user_id, role)
@@ -690,11 +692,15 @@ export function registerApiRoutes(app: Express) {
     if (password.length > 128) throw new HttpError(400, 'A senha pode ter no máximo 128 caracteres.');
     if (password.length < 6) throw new HttpError(400, 'A senha precisa ter pelo menos 6 caracteres.');
 
-    // Plano montado no funil de onboarding: só existe no cadastro de uma conta nova.
+    // O cadastro só existe pelo funil de onboarding (/comecar): exige o plano e as respostas,
+    // validados por completo antes de criar qualquer coisa.
     const plan = parsePlan(req.body?.plan);
-    const enxovalName = plan
-      ? requireText(req.body?.enxovalName ?? 'Nossa casa nova', 'Nome do enxoval').slice(0, 100)
-      : null;
+    if (!plan) {
+      throw new HttpError(400, 'O cadastro é feito pelo funil de onboarding. Monte o seu plano em /comecar.');
+    }
+    const enxovalName = requireText(req.body?.enxovalName, 'Nome do enxoval');
+    if (enxovalName.length > 100) throw new HttpError(400, 'Nome do enxoval muito longo.');
+    const profile = parseOnboardingProfile(req.body?.profile);
 
     const passwordHash = await hashPassword(password);
     const userId = randomUUID();
@@ -706,9 +712,7 @@ export function registerApiRoutes(app: Express) {
           VALUES ($1, $2, $3, $4, now())
         `, [userId, name, email, passwordHash]);
 
-        if (plan && enxovalName) {
-          await insertEnxoval(client, userId, enxovalName, { useDefaultTemplate: false, plan });
-        }
+        await insertEnxoval(client, userId, enxovalName, { useDefaultTemplate: false, plan, profile });
       });
     } catch (err) {
       if ((err as { code?: string }).code === '23505') {

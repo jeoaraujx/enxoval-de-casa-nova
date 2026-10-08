@@ -4,7 +4,7 @@ import type { Answers } from "./types";
 const STORAGE_KEY = "larume.onboarding.v1";
 
 export interface SavedOnboarding {
-  v: 1;
+  v: 2;
   answers: Answers;
   step: string;
   /** A pessoa chegou ao plano pronto. */
@@ -16,13 +16,16 @@ export function loadOnboarding(): SavedOnboarding | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw) as SavedOnboarding;
-    if (data?.v !== 1 || typeof data.step !== "string" || !data.answers) {
+    const version = (data as { v?: number })?.v;
+    if ((version !== 1 && version !== 2) || typeof data.step !== "string" || !data.answers) {
       return null;
     }
-    return {
-      ...data,
-      answers: { ...emptyAnswers, ...data.answers },
-    };
+    const answers = { ...emptyAnswers, ...data.answers };
+    // Na versão 1, cozinha e banheiro eram sempre incluídos e não ficavam na lista.
+    if (version === 1 && answers.rooms) {
+      answers.rooms = [...new Set(["cozinha", "banheiro", ...answers.rooms])] as typeof answers.rooms;
+    }
+    return { ...data, v: 2, answers };
   } catch {
     return null;
   }

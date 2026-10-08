@@ -11,6 +11,7 @@ import type { RoomKey } from "./types";
  *  K só casa                         A só apartamento ou studio
  *  X fora do studio                  O só studio
  *  N só Nordeste                     R só Rio Grande do Sul
+ *  I precisa estar pronto na primeira noite
  *
  * Faixa de preço (1 a 4) serve apenas para a estimativa de referência do funil.
  * Nunca é gravada como preço do item.
@@ -31,13 +32,13 @@ const e = (
 
 export const CATALOG: CatalogEntry[] = [
   // Quarto principal
-  e("quarto", "Cama (estrutura ou box)", 4, "E"),
-  e("quarto", "Colchão", 4, "E"),
+  e("quarto", "Cama (estrutura ou box)", 4, "EI"),
+  e("quarto", "Colchão", 4, "EI"),
   e("quarto", "Guarda-roupa", 4, "E"),
-  e("quarto", "Jogo de cama {cama}", 3, "E"),
-  e("quarto", "Travesseiros", 2, "EQ"),
+  e("quarto", "Jogo de cama {cama}", 3, "EI"),
+  e("quarto", "Travesseiros", 2, "EQI"),
   e("quarto", "Protetor de colchão", 2, "E"),
-  e("quarto", "Cortina blackout", 3, "E"),
+  e("quarto", "Cortina blackout", 3, "EI"),
   e("quarto", "Cabides", 1, "E"),
   e("quarto", "Cesto de roupa suja", 1, "E"),
   e("quarto", "Manta leve", 2, "E"),
@@ -69,12 +70,12 @@ export const CATALOG: CatalogEntry[] = [
   e("quartoExtra", "Cesto de roupa suja", 1, ""),
 
   // Banheiro
-  e("banheiro", "Toalhas de banho", 2, "ET"),
+  e("banheiro", "Toalhas de banho", 2, "ETI"),
   e("banheiro", "Toalhas de rosto", 1, "ET"),
-  e("banheiro", "Tapete de banheiro", 1, "E"),
+  e("banheiro", "Tapete de banheiro", 1, "EI"),
   e("banheiro", "Cortina de box", 2, "E"),
-  e("banheiro", "Lixeira de banheiro", 1, "E"),
-  e("banheiro", "Porta-papel higiênico", 1, "E"),
+  e("banheiro", "Lixeira de banheiro", 1, "EI"),
+  e("banheiro", "Porta-papel higiênico", 1, "EI"),
   e("banheiro", "Escova sanitária", 1, "E"),
   e("banheiro", "Saboneteira ou dispenser", 1, "E"),
   e("banheiro", "Porta-toalhas", 2, "E"),
@@ -91,10 +92,10 @@ export const CATALOG: CatalogEntry[] = [
   e("cozinha", "Jogo de panelas", 3, "E"),
   e("cozinha", "Frigideira antiaderente", 2, "E"),
   e("cozinha", "Panela de pressão", 2, "E"),
-  e("cozinha", "Pratos rasos", 2, "EP"),
+  e("cozinha", "Pratos rasos", 2, "EPI"),
   e("cozinha", "Pratos fundos", 2, "EP"),
-  e("cozinha", "Copos", 2, "EP"),
-  e("cozinha", "Talheres (garfo, faca e colher)", 2, "EP"),
+  e("cozinha", "Copos", 2, "EPI"),
+  e("cozinha", "Talheres (garfo, faca e colher)", 2, "EPI"),
   e("cozinha", "Xícaras e canecas", 2, "P"),
   e("cozinha", "Facas de cozinha", 2, "E"),
   e("cozinha", "Tábua de corte", 1, "E"),
@@ -107,7 +108,7 @@ export const CATALOG: CatalogEntry[] = [
   e("cozinha", "Assadeira", 2, "E"),
   e("cozinha", "Potes herméticos", 2, "E"),
   e("cozinha", "Bacias e tigelas", 1, "E"),
-  e("cozinha", "Panos de prato", 1, "E"),
+  e("cozinha", "Panos de prato", 1, "EI"),
   e("cozinha", "Lixeira de cozinha", 2, "E"),
   e("cozinha", "Luvas térmicas", 1, "E"),
   e("cozinha", "Dispenser de detergente e esponja", 1, "E"),
@@ -160,10 +161,10 @@ export const CATALOG: CatalogEntry[] = [
   e("servico", "Vassoura e pá", 1, "E"),
   e("servico", "Rodo", 1, "E"),
   e("servico", "Panos de chão", 1, "E"),
-  e("servico", "Kit de limpeza (flanelas, esponjas, multiuso)", 1, "E"),
+  e("servico", "Kit de limpeza (flanelas, esponjas, multiuso)", 1, "EI"),
   e("servico", "Prendedores de roupa", 1, "E"),
   e("servico", "Ferro de passar", 2, "E"),
-  e("servico", "Extensões e adaptadores de tomada", 1, "E"),
+  e("servico", "Extensões e adaptadores de tomada", 1, "EI"),
   e("servico", "Kit de ferramentas básicas", 2, "E"),
   e("servico", "Cesto de roupa", 2, ""),
   e("servico", "Tábua de passar", 2, ""),
@@ -182,7 +183,7 @@ export const CATALOG: CatalogEntry[] = [
   e("sala", "Rack ou painel de TV", 3, "E"),
   e("sala", "Mesa de jantar com cadeiras", 4, "EX"),
   e("sala", "Cortinas", 3, "E"),
-  e("sala", "Luminária ou abajur", 2, "E"),
+  e("sala", "Luminária ou abajur", 2, "EI"),
   e("sala", "Ventilador de teto", 3, "H"),
   e("sala", "Ar-condicionado", 4, "H"),
   e("sala", "Manta para o sofá", 2, "F"),

@@ -561,6 +561,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
           <a href="#como-funciona">Como funciona</a>
           <a href="#planos">Planos</a>
           <a href="/demo">Demonstração</a>
+          <a href="/privacidade">Privacidade</a>
         </div>
         <span>
           Feito com cuidado, para novos começos.

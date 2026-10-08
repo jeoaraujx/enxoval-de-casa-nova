@@ -1516,3 +1516,273 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Valor: comparação com a lista genérica */
+.ob-eyebrow-left {
+  margin-top: 6px;
+}
+.ob-bars {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+}
+.ob-bar-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 14.5px;
+}
+.ob-bar-label strong {
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 500;
+}
+.ob-bar-track {
+  height: 14px;
+  border-radius: 99px;
+  background: #ece5d8;
+  overflow: hidden;
+}
+.ob-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+.ob-bar-generic {
+  background: #cdbfa8;
+}
+.ob-bar-plan {
+  background: linear-gradient(90deg, #b99572, var(--ob-wood));
+}
+.ob-bar-row small {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--ob-muted);
+}
+.ob-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--ob-sage);
+  color: #3a4a33;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.ob-callout svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.ob-reasons {
+  display: grid;
+  gap: 10px;
+}
+.ob-reason {
+  padding: 14px 16px;
+  border: 1px solid var(--ob-line);
+  border-radius: 16px;
+  background: #fffdf9;
+}
+.ob-reason > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.ob-reason strong {
+  font-size: 15px;
+  line-height: 1.35;
+}
+.ob-reason span {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ob-wood-deep);
+}
+.ob-reason p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ob-muted);
+}
+.ob-fine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 18px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ob-muted);
+}
+
+/* Valor: primeira noite */
+.ob-night {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+.ob-night-group {
+  padding: 14px 16px 6px;
+  border: 1px solid var(--ob-line);
+  border-radius: 16px;
+  background: #fffdf9;
+}
+.ob-night-group h2 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--ob-wood-deep);
+}
+.ob-night-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ob-night-group li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  font-size: 15.5px;
+}
+.ob-night-group li small {
+  color: var(--ob-muted);
+  font-size: 13.5px;
+}
+.ob-night-check {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ob-wood);
+  color: #fff;
+}
+
+/* Valor: cronograma */
+.ob-schedule {
+  position: relative;
+  margin: 24px 0 0;
+  padding: 0 0 0 26px;
+  list-style: none;
+}
+.ob-schedule::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(#d8c3a3, var(--ob-wood));
+}
+.ob-schedule li {
+  position: relative;
+  padding-bottom: 14px;
+}
+.ob-schedule-dot {
+  position: absolute;
+  left: -26px;
+  top: 16px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fffdf9;
+  border: 4px solid var(--ob-wood);
+}
+.ob-schedule li[data-now="true"] .ob-schedule-dot {
+  background: var(--ob-wood);
+}
+.ob-schedule-card {
+  padding: 14px 16px;
+  border: 1px solid var(--ob-line);
+  border-radius: 16px;
+  background: #fffdf9;
+}
+.ob-schedule-date {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  color: var(--ob-wood-deep);
+}
+.ob-schedule-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 4px;
+}
+.ob-schedule-title strong {
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 500;
+}
+.ob-schedule-title span {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: var(--ob-selected);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ob-wood-deep);
+}
+.ob-schedule-card p {
+  margin: 6px 0 4px;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+.ob-schedule-card small {
+  font-size: 13.5px;
+  color: var(--ob-muted);
+}
+
+/* Salvar: o que a conta libera */
+.ob-benefits {
+  display: grid;
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 16px;
+  list-style: none;
+  border-radius: 16px;
+  background: #fbf4e8;
+  border: 1px solid #efdfc3;
+}
+.ob-benefits li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+.ob-benefits li > span {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #fffdf9;
+  color: var(--ob-wood);
+}
+
+/* Aviso de privacidade na tela de salvar */
+.ob-privacy {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ob-muted);
+}
+.ob-privacy a {
+  color: var(--ob-wood-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

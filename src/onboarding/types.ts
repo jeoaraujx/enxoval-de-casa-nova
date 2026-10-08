@@ -7,7 +7,7 @@ export type Climate = "hot" | "mild" | "cold";
 export type Worry = "start" | "waste" | "forget" | "budget" | "time";
 export type Usage = "buy" | "spend" | "links" | "share";
 
-/** Espaços que a pessoa pode escolher. Cozinha e banheiro estão sempre no plano. */
+/** Espaços do plano. "eletro" acompanha a cozinha; os demais a pessoa marca ou desmarca. */
 export type RoomKey =
   | "cozinha"
   | "eletro"
@@ -19,10 +19,8 @@ export type RoomKey =
   | "externa"
   | "escritorio";
 
-export type OptionalRoom = Exclude<
-  RoomKey,
-  "cozinha" | "eletro" | "banheiro"
->;
+/** Espaços que a pessoa escolhe na tela de ambientes (eletrodomésticos vêm com a cozinha). */
+export type OptionalRoom = Exclude<RoomKey, "eletro">;
 
 export interface Answers {
   name: string;
@@ -50,6 +48,40 @@ export interface PlanItem {
   tier: 1 | 2 | 3 | 4;
   /** Ambiente de origem no catálogo (no studio, sala e quarto dividem a mesma lista). */
   room: RoomKey;
+  /** Precisa estar pronto na noite da mudança. */
+  firstNight: boolean;
+}
+
+export type ExcludeReason =
+  | "rooms"
+  | "housing"
+  | "climate"
+  | "region"
+  | "moment"
+  | "style";
+
+/** O que a lista genérica manda comprar e o plano deixou de fora, e por quê. */
+export interface Savings {
+  genericTotal: number;
+  planTotal: number;
+  removedCount: number;
+  genericMinCents: number;
+  genericMaxCents: number;
+  planMinCents: number;
+  planMaxCents: number;
+  reasons: { reason: ExcludeReason; count: number; examples: string[] }[];
+}
+
+export type MilestoneId = "big" | "mid" | "small" | "night" | "after";
+
+export interface Milestone {
+  id: MilestoneId;
+  /** AAAA-MM-DD; null quando a pessoa não sabe a data da mudança. */
+  date: string | null;
+  /** Já passou da data ideal: o marco vale "agora". */
+  now: boolean;
+  count: number;
+  examples: string[];
 }
 
 export interface PlanCategory {

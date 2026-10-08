@@ -1,16 +1,19 @@
-import { CATALOG } from "./catalog";
+import { CATALOG, type CatalogEntry } from "./catalog";
 import type {
   Answers,
   Budget,
   Climate,
+  ExcludeReason,
   GeneratedPlan,
   Housing,
+  Milestone,
   Moment,
   OptionalRoom,
   PlanCategory,
   PlanItem,
   PlanPayload,
   RoomKey,
+  Savings,
 } from "./types";
 
 export const emptyAnswers: Answers = {
@@ -131,7 +134,9 @@ export function defaultRooms(
   people: number | null,
 ): OptionalRoom[] {
   const rooms: OptionalRoom[] =
-    housing === "studio" ? ["servico"] : ["sala", "quarto", "servico", "externa"];
+    housing === "studio"
+      ? ["cozinha", "banheiro", "sala", "servico"]
+      : ["cozinha", "banheiro", "sala", "quarto", "servico", "externa"];
   if (housing !== "studio" && (people ?? 0) >= 3) rooms.push("quartoExtra");
   return rooms;
 }
@@ -185,12 +190,14 @@ function resolve(a: Answers): Resolved {
   const housing = a.housing ?? "apartamento";
   const moment = a.moment ?? "casal";
   const people = Math.min(Math.max(a.people ?? defaultPeople(moment), 1), 6);
-  const optional = a.rooms ?? defaultRooms(housing, people);
-  const rooms = new Set<RoomKey>(["cozinha", "eletro", "banheiro", ...optional]);
+  const rooms = new Set<RoomKey>(a.rooms ?? defaultRooms(housing, people));
+  // Eletrodomésticos acompanham a cozinha.
+  if (rooms.has("cozinha")) rooms.add("eletro");
+  // Studio tem sala e quarto juntos: marcar a sala traz o quarto.
   if (housing === "studio") {
-    rooms.add("sala");
-    rooms.add("quarto");
     rooms.delete("quartoExtra");
+    if (rooms.has("sala")) rooms.add("quarto");
+    else rooms.delete("quarto");
   }
   const info = stateInfo(a.state);
   return {
@@ -206,30 +213,53 @@ function resolve(a: Answers): Resolved {
   };
 }
 
+interface Evaluation {
+  ok: boolean;
+  essential: boolean;
+  /** Preenchido quando o item não entra no plano. */
+  reason?: ExcludeReason;
+}
+
+const skip = (reason: ExcludeReason): Evaluation => ({ ok: false, essential: false, reason });
+
+/** Decide se um item do catálogo entra no plano e, se não, por quê. */
+function evaluate(entry: CatalogEntry, r: Resolved, full: boolean): Evaluation {
+  const has = (letter: string) => entry.flags.includes(letter);
+
+  if (!r.rooms.has(entry.room)) return skip("rooms");
+  if (
+    (has("K") && r.housing !== "casa") ||
+    (has("A") && r.housing === "casa") ||
+    (has("X") && r.housing === "studio") ||
+    (has("O") && r.housing !== "studio")
+  ) {
+    return skip("housing");
+  }
+  if (has("F") && r.climate === "hot") return skip("climate");
+  if ((has("N") && !NORDESTE.has(r.uf)) || (has("R") && r.uf !== "RS")) {
+    return skip("region");
+  }
+  if ((has("C") && r.moment !== "casal") || (has("S") && r.moment === "casal")) {
+    return skip("moment");
+  }
+
+  const essential =
+    has("E") ||
+    (has("H") && r.climate === "hot") ||
+    (has("F") && r.climate === "cold");
+  if (!full && !essential) return skip("style");
+  return { ok: true, essential };
+}
+
 function itemsFor(r: Resolved, full: boolean) {
   const byRoom = new Map<RoomKey, PlanItem[]>();
   const seen = new Set<string>();
 
   for (const entry of CATALOG) {
-    if (!r.rooms.has(entry.room)) continue;
-    const f = entry.flags;
-    const has = (letter: string) => f.includes(letter);
-
-    if (has("C") && r.moment !== "casal") continue;
-    if (has("S") && r.moment === "casal") continue;
-    if (has("K") && r.housing !== "casa") continue;
-    if (has("A") && r.housing === "casa") continue;
-    if (has("X") && r.housing === "studio") continue;
-    if (has("O") && r.housing !== "studio") continue;
-    if (has("N") && !NORDESTE.has(r.uf)) continue;
-    if (has("R") && r.uf !== "RS") continue;
-    if (has("F") && r.climate === "hot") continue;
-
-    const essential =
-      has("E") ||
-      (has("H") && r.climate === "hot") ||
-      (has("F") && r.climate === "cold");
-    if (!full && !essential) continue;
+    const verdict = evaluate(entry, r, full);
+    if (!verdict.ok) continue;
+    const { essential } = verdict;
+    const has = (letter: string) => entry.flags.includes(letter);
 
     const name = entry.name.replace(
       "{cama}",
@@ -259,6 +289,7 @@ function itemsFor(r: Resolved, full: boolean) {
       essential,
       tier: entry.tier,
       room: entry.room,
+      firstNight: has("I"),
     });
     byRoom.set(roomKey, list);
   }
@@ -395,4 +426,151 @@ export function formatEstimate(minCents: number, maxCents: number) {
   const low = toThousands(minCents);
   const high = Math.max(toThousands(maxCents), low + 1);
   return `R$ ${low} a ${high} mil`;
+}
+
+/* ----------------------------------------------- informações de valor do funil */
+
+const ALL_ROOMS: OptionalRoom[] = [
+  "cozinha",
+  "banheiro",
+  "sala",
+  "quarto",
+  "quartoExtra",
+  "servico",
+  "externa",
+  "escritorio",
+];
+
+/** Quantos itens cada espaço teria no plano completo, para mostrar ao escolher. */
+export function roomItemCounts(
+  answers: Answers,
+): Partial<Record<OptionalRoom, number>> {
+  const r = resolve({ ...answers, rooms: ALL_ROOMS, style: "full" });
+  const map = itemsFor(r, true);
+  const count = (key: RoomKey) => map.get(key)?.length ?? 0;
+  return {
+    cozinha: count("cozinha") + count("eletro"),
+    banheiro: count("banheiro"),
+    sala: count("sala"),
+    quarto: count("quarto"),
+    quartoExtra: count("quartoExtra"),
+    servico: count("servico"),
+    externa: count("externa"),
+    escritorio: count("escritorio"),
+  };
+}
+
+/**
+ * Compara o plano com uma lista genérica (todo o catálogo, sem considerar clima, moradia,
+ * região, momento nem espaços) e explica o que ficou de fora.
+ */
+export function savingsFor(answers: Answers): Savings {
+  const r = resolve(answers);
+  const full = r.style === "full";
+  const plan = generatePlan(answers);
+  const byReason = new Map<ExcludeReason, { count: number; examples: string[] }>();
+  let genericMin = 0;
+  let genericMax = 0;
+  let removed = 0;
+
+  for (const entry of CATALOG) {
+    genericMin += TIER_BAND[entry.tier][0];
+    genericMax += TIER_BAND[entry.tier][1];
+    const verdict = evaluate(entry, r, full);
+    if (verdict.ok) continue;
+    removed += 1;
+    const reason = verdict.reason ?? "rooms";
+    const slot = byReason.get(reason) ?? { count: 0, examples: [] };
+    slot.count += 1;
+    const name = entry.name.replace("{cama}", "de casal");
+    if (slot.examples.length < 3 && !slot.examples.includes(name)) {
+      slot.examples.push(name);
+    }
+    byReason.set(reason, slot);
+  }
+
+  return {
+    genericTotal: CATALOG.length,
+    planTotal: plan.stats.total,
+    removedCount: removed,
+    genericMinCents: genericMin,
+    genericMaxCents: genericMax,
+    planMinCents: plan.stats.estimateMinCents,
+    planMaxCents: plan.stats.estimateMaxCents,
+    reasons: [...byReason.entries()]
+      .map(([reason, value]) => ({ reason, ...value }))
+      .sort((x, y) => y.count - x.count),
+  };
+}
+
+/** Itens do plano que precisam estar prontos na noite da mudança. */
+export function firstNightItems(plan: GeneratedPlan) {
+  return plan.categories.flatMap((category) =>
+    category.items
+      .filter((item) => item.firstNight)
+      .map((item) => ({ ...item, category: category.name })),
+  );
+}
+
+/** Semanas antes da mudança em que cada grupo de compras deve estar resolvido. */
+const MILESTONE_WEEKS: Record<Milestone["id"], number> = {
+  big: 8,
+  mid: 5,
+  small: 2,
+  night: 1,
+  after: -4,
+};
+
+/**
+ * Divide o plano em marcos de compra (todo item cai em exatamente um) e, se a pessoa
+ * sabe a data da mudança, calcula até quando cada marco deve estar resolvido.
+ */
+export function scheduleFor(
+  plan: GeneratedPlan,
+  moveDate: string | null,
+  now = new Date(),
+): Milestone[] {
+  const groups: Record<Milestone["id"], string[]> = {
+    big: [],
+    mid: [],
+    small: [],
+    night: [],
+    after: [],
+  };
+  for (const category of plan.categories) {
+    for (const item of category.items) {
+      const id: Milestone["id"] = item.firstNight
+        ? "night"
+        : !item.essential
+          ? "after"
+          : item.tier === 4
+            ? "big"
+            : item.tier === 3
+              ? "mid"
+              : "small";
+      groups[id].push(item.name);
+    }
+  }
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const order: Milestone["id"][] = ["big", "mid", "small", "night", "after"];
+  return order
+    .filter((id) => groups[id].length > 0)
+    .map((id) => {
+      let date: string | null = null;
+      let isNow = false;
+      if (moveDate) {
+        const target = parseLocalDate(moveDate);
+        target.setDate(target.getDate() - MILESTONE_WEEKS[id] * 7);
+        isNow = target < today;
+        date = toISODate(isNow ? today : target);
+      }
+      return {
+        id,
+        date,
+        now: isNow,
+        count: groups[id].length,
+        examples: groups[id].slice(0, 3),
+      };
+    });
 }

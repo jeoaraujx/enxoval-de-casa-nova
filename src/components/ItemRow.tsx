@@ -148,7 +148,9 @@ export function ItemRow({
             <span className="item-name">{item.name}</span>
           </button>
           <div className="item-meta">
-            {categoryName && <span>{categoryName}</span>}
+            {categoryName && (
+              <span className="item-category-tag">{categoryName}</span>
+            )}
             <span className="item-meta-price">
               {formattedPrice || "Sem preço"}
             </span>
